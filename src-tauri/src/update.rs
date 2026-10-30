@@ -419,6 +419,26 @@ fn json_of<T: Serialize>(value: T) -> Res<Value> {
 /// A release, shaped the way GitHub sends it. Used by the tests and by nothing
 /// else, so the real parsing is exercised against the real field names.
 #[cfg(test)]
+/// A release tag that is always newer than the build running the tests.
+/// Pinning a literal tag here meant that cutting that release broke the suite.
+fn newer_tag() -> String {
+    let major: u32 = env!("DAFTAR_VERSION")
+        .split('.')
+        .next()
+        .and_then(|m| m.parse().ok())
+        .unwrap_or(0);
+    format!("v{}.0.0", major + 1)
+}
+
+fn newer_version() -> String {
+    newer_tag().trim_start_matches('v').to_string()
+}
+
+/// The apk asset name GitHub would publish for that tag.
+fn apk_name() -> String {
+    format!("Daftar-{}.apk", newer_version())
+}
+
 fn release_json(tag: &str, assets: &[(&str, &str)]) -> Value {
     let assets: Vec<Value> = assets
         .iter()
@@ -500,12 +520,12 @@ mod tests {
     fn the_apk_is_picked_from_the_assets() {
         // A signature and a checksum are not the app.
         let release = release_json(
-            "v0.2.0",
+            &newer_tag(),
             &[
-                ("Daftar-0.2.0.apk.sig", "https://example.test/a.sig"),
+                (&format!("{}.sig", apk_name()), "https://example.test/a.sig"),
                 ("notes.txt", "https://example.test/notes.txt"),
-                ("Daftar-0.2.0-arm64.apk", "https://example.test/arm64.apk"),
-                ("Daftar-0.2.0-universal.apk", "https://example.test/universal.apk"),
+                (&format!("{}-arm64.apk", apk_name().trim_end_matches(".apk")), "https://example.test/arm64.apk"),
+                (&format!("{}-universal.apk", apk_name().trim_end_matches(".apk")), "https://example.test/universal.apk"),
             ],
         );
         let info = evaluate("0.1.1", &release);
@@ -517,8 +537,8 @@ mod tests {
 
         // With only one APK, that one is picked.
         let single = release_json(
-            "v0.2.0",
-            &[("Daftar-0.2.0.apk", "https://example.test/one.apk")],
+            &newer_tag(),
+            &[(&apk_name(), "https://example.test/one.apk")],
         );
         assert_eq!(
             evaluate("0.1.1", &single).apk_url.as_deref(),
@@ -526,7 +546,7 @@ mod tests {
         );
 
         // No APK at all is not a crash: the update is known, the file is not.
-        let empty = release_json("v0.2.0", &[("notes.txt", "https://example.test/n")]);
+        let empty = release_json(&newer_tag(), &[("notes.txt", "https://example.test/n")]);
         let info = evaluate("0.1.1", &empty);
         assert!(info.behind);
         assert!(info.apk_url.is_none());
@@ -561,12 +581,12 @@ mod tests {
     #[test]
     fn a_check_against_a_real_answer_reports_what_it_finds() {
         let github = Stub::answering(release_json(
-            "v0.2.0",
-            &[("Daftar-0.2.0.apk", "https://example.test/a.apk")],
+            &newer_tag(),
+            &[(&apk_name(), "https://example.test/a.apk")],
         ));
         let info = check_with(&github);
         assert!(info.behind);
-        assert_eq!(info.latest, "0.2.0");
+        assert_eq!(info.latest, newer_version());
     }
 
     // ------------------------------------------------------------------ download
@@ -576,8 +596,8 @@ mod tests {
         let bench = Bench::new("update-ok");
         let bytes = b"PK\x03\x04 not really an apk".to_vec();
         let github = Stub::answering(release_json(
-            "v0.2.0",
-            &[("Daftar-0.2.0.apk", "https://example.test/a.apk")],
+            &newer_tag(),
+            &[(&apk_name(), "https://example.test/a.apk")],
         ))
         .with_bytes(bytes.clone());
 
@@ -586,7 +606,7 @@ mod tests {
         let path = std::path::Path::new(&got.path);
         assert_eq!(
             path.file_name().unwrap().to_string_lossy(),
-            "daftar-0.2.0.apk"
+            format!("daftar-{}.apk", newer_version())
         );
         assert!(path.is_absolute(), "a path for an intent must be absolute");
         assert_eq!(got.size, bytes.len() as i64);
@@ -603,8 +623,8 @@ mod tests {
         let bench = Bench::new("update-fail");
         // It writes half the file and then the connection dies.
         let github = Stub::answering(release_json(
-            "v0.2.0",
-            &[("Daftar-0.2.0.apk", "https://example.test/a.apk")],
+            &newer_tag(),
+            &[(&apk_name(), "https://example.test/a.apk")],
         ))
         .breaking_after(7);
 
