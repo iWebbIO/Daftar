@@ -1,0 +1,19 @@
+node_modules/
+dist/
+src-tauri/target/
+*.log
+
+# Generated on every build
+src-tauri/gen/android/app/build/
+src-tauri/gen/android/build/
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/local.properties
+src-tauri/gen/apple/
+.gradle/
+
+# Keystore never leaves the machine that signed the build.
+*.keystore
+*.jks
+
+.DS_Store
+Thumbs.db

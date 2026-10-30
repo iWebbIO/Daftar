@@ -1,0 +1,137 @@
+// The only door to the Rust side.
+//
+// One command, `call`, with an operation name and arguments. Every operation
+// the app can perform is listed here with its real types, so a screen never
+// writes a stringly-typed call by hand twice.
+
+import { invoke } from "@tauri-apps/api/core";
+import type {
+  AgeBucket,
+  BackupInfo,
+  BotInfo,
+  Cheque,
+  ChequeRow,
+  Doc,
+  DocFull,
+  DocInput,
+  DocRow,
+  Note,
+  Party,
+  PartyBook,
+  PartyCard,
+  Payment,
+  PaymentInput,
+  PaymentRow,
+  PricePoint,
+  Product,
+  ProductReport,
+  ReportDays,
+  SearchHit,
+  Settings,
+  SumSheet,
+  Task,
+  TaskRow,
+  TodayView,
+  Totals,
+} from "./types";
+
+async function call<T>(op: string, args: unknown = {}): Promise<T> {
+  return (await invoke<T>("call", { op, args })) as T;
+}
+
+/** Errors arrive already written in Persian, ready to show. */
+export function errorText(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object" && "message" in e) return String((e as Error).message);
+  return "مشکلی پیش آمد";
+}
+
+export const api = {
+  // ---- today -------------------------------------------------------------
+  today: (day?: number) => call<TodayView>("home.today", { day: day ?? null }),
+
+  // ---- settings ----------------------------------------------------------
+  settings: () => call<Settings>("settings.get"),
+  saveSettings: (settings: Settings) => call<boolean>("settings.save", { settings }),
+
+  // ---- parties -----------------------------------------------------------
+  parties: (opts: { q?: string; filter?: string; sort?: string } = {}) =>
+    call<PartyCard[]>("parties.list", opts),
+  party: (id: number) => call<Party>("parties.get", { id }),
+  saveParty: (party: Partial<Party> & { name: string }) =>
+    call<Party>("parties.save", { party }),
+  partyBook: (id: number) => call<PartyBook>("parties.book", { id }),
+  partiesSuggest: (q: string) => call<PartyCard[]>("parties.suggest", { q }),
+  totals: () => call<Totals>("parties.totals"),
+
+  // ---- products ----------------------------------------------------------
+  products: (q?: string) => call<Product[]>("products.list", { q: q ?? null }),
+  saveProduct: (product: Partial<Product> & { name: string }) =>
+    call<Product>("products.save", { product }),
+  priceHistory: (productId: number, partyId?: number) =>
+    call<PricePoint[]>("products.history", { productId, partyId: partyId ?? null }),
+  usualItems: (partyId: number) => call<Product[]>("products.usual", { partyId }),
+
+  // ---- invoices ----------------------------------------------------------
+  doc: (id: number) => call<DocFull>("orders.get", { id }),
+  saveDoc: (input: DocInput) => call<Doc>("orders.save", { input }),
+  voidDoc: (id: number, reason: string) => call<Doc>("orders.void", { id, reason }),
+  setFinal: (id: number, final: boolean) => call<Doc>("orders.setFinal", { id, final }),
+  repeatDoc: (id: number) => call<DocInput>("orders.repeat", { id }),
+  docs: (opts: { kind?: string; partyId?: number; from?: number; to?: number; limit?: number } = {}) =>
+    call<DocRow[]>("orders.list", opts),
+
+  // ---- payments ----------------------------------------------------------
+  savePayment: (input: PaymentInput) => call<Payment>("payments.save", { input }),
+  voidPayment: (id: number, reason: string) => call<Payment>("payments.void", { id, reason }),
+  payments: (opts: { partyId?: number; from?: number; to?: number; limit?: number } = {}) =>
+    call<PaymentRow[]>("payments.list", opts),
+  suggestAllocations: (partyId: number, amount: number) =>
+    call<{ docId: number; amount: number }[]>("payments.suggest", { partyId, amount }),
+
+  // ---- cheques -----------------------------------------------------------
+  cheques: (opts: { status?: string } = {}) => call<ChequeRow[]>("cheques.list", opts),
+  saveCheque: (cheque: Partial<Cheque> & { partyId: number; amount: number; dueDay: number }) =>
+    call<Cheque>("cheques.save", { cheque }),
+  setChequeStatus: (id: number, status: string) =>
+    call<Cheque>("cheques.status", { id, status }),
+
+  // ---- tasks -------------------------------------------------------------
+  tasks: (opts: { includeDone?: boolean } = {}) => call<TaskRow[]>("tasks.list", opts),
+  saveTask: (task: Partial<Task> & { text: string }) => call<Task>("tasks.save", { task }),
+  toggleTask: (id: number) => call<Task>("tasks.toggle", { id }),
+
+  // ---- notes -------------------------------------------------------------
+  notes: (opts: { q?: string; limit?: number } = {}) => call<Note[]>("notes.list", opts),
+  saveNote: (note: Partial<Note> & { body: string }) => call<Note>("notes.save", { note }),
+
+  // ---- sum sheets --------------------------------------------------------
+  sums: () => call<SumSheet[]>("sums.list", {}),
+  sumSheet: (id: number) => call<SumSheet>("sums.get", { id }),
+  saveSumSheet: (sheet: Partial<SumSheet> & { rows: SumSheet["rows"] }) =>
+    call<SumSheet>("sums.save", { sheet }),
+
+  // ---- reports -----------------------------------------------------------
+  reportDays: (from: number, to: number) =>
+    call<ReportDays[]>("reports.days", { from, to }),
+  reportProducts: (from: number, to: number) =>
+    call<ProductReport[]>("reports.products", { from, to }),
+  reportAgeing: () => call<AgeBucket[]>("reports.ageing", {}),
+
+  // ---- search ------------------------------------------------------------
+  search: (q: string) => call<SearchHit[]>("search.all", { q }),
+
+  // ---- invoice and statement --------------------------------------------
+  invoiceSvg: (docId: number) => call<{ svg: string }>("invoice.svg", { docId }),
+  invoiceSend: (docId: number) =>
+    call<{ ok: boolean; message: string }>("invoice.send", { docId }),
+  statementSend: (partyId: number) =>
+    call<{ ok: boolean; message: string }>("invoice.sendStatement", { partyId }),
+  invoicePreview: (docId: number) => call<{ path: string }>("invoice.preview", { docId }),
+
+  // ---- telegram and backup ----------------------------------------------
+  botCheck: (token: string) => call<BotInfo>("telegram.check", { token }),
+  botLink: (token: string) => call<BotInfo>("telegram.link", { token }),
+  backupNow: () => call<BackupInfo>("backup.now", {}),
+  backupStatus: () => call<BackupInfo>("backup.status", {}),
+};

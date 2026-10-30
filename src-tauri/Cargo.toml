@@ -1,0 +1,46 @@
+[package]
+name = "daftar"
+version = "0.1.0"
+description = "دفتر — دفتر حساب و سفارش فروشگاه"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+name = "daftar_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# The local database. SQLite is compiled into the binary so nothing has to be
+# present on the phone; WAL keeps writes safe against a kill mid-save.
+rusqlite = { version = "0.41", features = ["bundled"] }
+
+# Persian text shaping for the invoice. HarfBuzz's Rust port produces the
+# contextual forms, ligatures and glyph positions Persian needs; ttf-parser
+# turns the resulting glyph ids into outlines.
+rustybuzz = "0.20"
+ttf-parser = "0.25"
+
+# The Telegram bot: invoices and backups leave the phone as an HTTPS upload.
+# ureq is a blocking client with rustls over ring, which is the combination that
+# links cleanly for Android without pulling OpenSSL or a C build of aws-lc.
+ureq = { version = "3.5", default-features = false, features = ["rustls", "json"] }
+
+# Backups are a zip of the database plus attachments.
+zip = { version = "9", default-features = false, features = ["deflate"] }
+
+# Local time, so "today" is the shop's today. Jalali conversion is ours.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

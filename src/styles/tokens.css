@@ -1,0 +1,68 @@
+/* دفتر — design tokens.
+ *
+ * Two jobs: numbers must be readable at arm's length in a shop, and nothing
+ * should look like a form. Light is the default because shops are bright; dark
+ * is there for the evening.
+ */
+
+:root {
+  --paper: #f5f2ea;
+  --surface: #fffefb;
+  --surface-2: #f0ece1;
+  --ink: #17180f;
+  --muted: #6d6b60;
+  --faint: #9a978a;
+  --line: #e2dcce;
+  --line-strong: #cdc5b3;
+
+  --brand: #17614f;
+  --brand-soft: #e3efe9;
+  --on-brand: #ffffff;
+
+  --positive: #17614f;
+  --positive-soft: #e3efe9;
+  --negative: #a3382a;
+  --negative-soft: #f8e7e3;
+  --warn: #8f6208;
+  --warn-soft: #f7edd6;
+
+  --radius: 16px;
+  --radius-sm: 11px;
+  --radius-lg: 22px;
+
+  --shadow: 0 1px 2px rgba(23, 24, 15, 0.06), 0 6px 18px -8px rgba(23, 24, 15, 0.16);
+  --shadow-lift: 0 2px 4px rgba(23, 24, 15, 0.08), 0 18px 40px -18px rgba(23, 24, 15, 0.3);
+
+  --tap: 52px;
+  --pad: 16px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --nav-h: 64px;
+
+  --ease: cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+:root[data-theme="dark"] {
+  --paper: #121412;
+  --surface: #1a1d1a;
+  --surface-2: #232723;
+  --ink: #ecebe2;
+  --muted: #9e9c90;
+  --faint: #75736a;
+  --line: #2c302c;
+  --line-strong: #3d423d;
+
+  --brand: #39a381;
+  --brand-soft: #1c2f28;
+  --on-brand: #08130f;
+
+  --positive: #45b78e;
+  --positive-soft: #17302a;
+  --negative: #e58272;
+  --negative-soft: #33201d;
+  --warn: #d8a44a;
+  --warn-soft: #2e2718;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.5), 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+}
