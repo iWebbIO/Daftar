@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "../api";
-import { currencyLabel, fa, fmtAmount, fmtQty, lineTotal, parseAmount, parseQty } from "../format";
+import { THOUSANDS, currencyLabel, fa, fmtAmount, fmtQty, latin, lineTotal, parseAmount, parseQty, toInput } from "../format";
 import { relativeDay, today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { Doc, LineInput, Party, PartyCard, Product } from "../types";
@@ -61,7 +61,24 @@ function roundTo(amount: number, step: number): number {
   return Math.floor((amount + half) / step) * step;
 }
 
-const plain = (digits: string) => (digits === "" ? 0 : Number(digits));
+/**
+ * The money digits he is typing, grouped the way money is read.
+ *
+ * A pad holds what the *label* says — ریال or تومان — the same digits
+ * `parseAmount` will turn into toman on save. `fmtAmount` is the other
+ * direction (toman → the number on the receipt) and would multiply these by ten
+ * again, which is exactly how the pad and the total came to disagree.
+ */
+function typedAmount(digits: string): string {
+  const whole = latin(digits).replace(/[^\d]/g, "");
+  if (whole === "") return "۰";
+  let out = "";
+  for (let i = 0; i < whole.length; i += 1) {
+    if (i > 0 && (whole.length - i) % 3 === 0) out += THOUSANDS;
+    out += whole[i];
+  }
+  return fa(out);
+}
 
 export default function Order(props: { kind: "sale" | "purchase"; id?: number; partyId?: number }) {
   const nav = useNav();
@@ -263,7 +280,9 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         if (!qty) return;
         const price = priceRef.current.get(pad.line.key) ?? pad.line.price;
         setPad({ mode: "price", line: { ...pad.line, qtyMilli: qty, price } });
-        setDigits(String(price));
+        // The pad holds the number the label promises, so the field is seeded
+        // with toInput — and parseAmount, once, turns it back into toman.
+        setDigits(toInput(price));
         setFresh(true);
         return;
       }
@@ -651,7 +670,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
               <div className="ord-total__row">
                 <button
                   className={`ord-chip ord-chip--soft ${discount !== 0 ? "is-on" : ""}`}
-                  onClick={() => openPad({ mode: "discount" }, discount ? String(discount) : "")}
+                  onClick={() => openPad({ mode: "discount" }, discount ? toInput(discount) : "")}
                 >
                   تخفیف
                 </button>
@@ -710,22 +729,22 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
                 {pad.mode === "price" && (
                   <>
                     <span className="ord-pad__label">فی</span>
-                    <span className="ord-pad__num num">{fmtAmount(plain(digits))}</span>
+                    <span className="ord-pad__num num">{typedAmount(digits)}</span>
                     <span className="ord-pad__side">
-                      جمع {fmtAmount(lineTotal(pad.line.qtyMilli, plain(digits)))}
+                      جمع {fmtAmount(lineTotal(pad.line.qtyMilli, parseAmount(digits) ?? 0))}
                     </span>
                   </>
                 )}
                 {pad.mode === "override" && (
                   <>
                     <span className="ord-pad__label">جمع سطر</span>
-                    <span className="ord-pad__num num">{fmtAmount(plain(digits))}</span>
+                    <span className="ord-pad__num num">{typedAmount(digits)}</span>
                   </>
                 )}
                 {pad.mode === "discount" && (
                   <>
                     <span className="ord-pad__label">تخفیف</span>
-                    <span className="ord-pad__num num">{fmtAmount(plain(digits))}</span>
+                    <span className="ord-pad__num num">{typedAmount(digits)}</span>
                     <span className="ord-pad__side">کم می‌شود</span>
                   </>
                 )}
@@ -784,7 +803,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
                 onClick={() => {
                   const start = look.overrideTotal ?? lineTotal(look.qtyMilli, look.price);
                   setLook(null);
-                  openPad({ mode: "override", key: look.key, name: look.name }, String(start));
+                  openPad({ mode: "override", key: look.key, name: look.name }, toInput(start));
                 }}
               />
               {look.overrideTotal !== null && (
