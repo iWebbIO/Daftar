@@ -104,6 +104,38 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  // A field under the keyboard is the worst thing that can happen in the app:
+  // the page makes room for the keyboard, and whatever is being typed is brought
+  // into the middle of what is left.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const apply = () => {
+      const covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.documentElement.style.setProperty("--kb", `${covered}px`);
+      document.body.classList.toggle("kb-open", covered > 90);
+    };
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    apply();
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const el = e.target as HTMLElement | null;
+      if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return;
+      window.setTimeout(() => {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 300);
+    };
+    document.addEventListener("focusin", onFocus);
+    return () => document.removeEventListener("focusin", onFocus);
+  }, []);
+
   const screen = useMemo(() => {
     switch (route.name) {
       case "today":

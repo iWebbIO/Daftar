@@ -860,3 +860,34 @@
   text-align: center;
   margin-top: 22px;
 }
+/* ------------------------------------------------------------- the keyboard */
+
+/* `--kb` is the height the phone keyboard covers, measured from visualViewport.
+   Nothing is pinned under it. */
+:root {
+  --kb: 0px;
+}
+
+/* While he is typing, the tab bar and the floating button step out of the way:
+   the field and the list behind it are what he needs. */
+body.kb-open .tabbar {
+  display: none;
+}
+
+body.kb-open .toasts {
+  bottom: calc(var(--kb) + 14px);
+}
+
+/* A sheet keeps its top on screen and its bottom above the keyboard. */
+body.kb-open .sheet {
+  max-height: calc(88% - var(--kb) * 0.35);
+}
+
+body.kb-open .sheet__body {
+  padding-bottom: calc(12px + var(--kb) * 0.2);
+}
+
+/* The focused field is never flush against the keyboard edge. */
+.field__box:focus-within {
+  scroll-margin-block: 120px;
+}

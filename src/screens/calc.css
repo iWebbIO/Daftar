@@ -70,14 +70,25 @@
 
 .calc__pad {
   flex: 0 0 auto;
-  padding: 8px var(--pad) calc(var(--safe-b) + 16px);
+  /* the tab bar sits over the bottom of the page, so leave room for it */
+  padding: 8px var(--pad) calc(var(--nav-h) + var(--safe-b) + 10px);
+}
+
+/* A shorter key here: the whole pad, the result and the tape have to share one
+   screen without scrolling. */
+.calc__pad .numpad__key {
+  height: 44px;
+  font-size: 20px;
+}
+.calc__pad .numpad__key--ok {
+  height: 44px;
 }
 
 .calc__ops {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 7px;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
 .calc__opbtn {

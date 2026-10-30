@@ -390,8 +390,9 @@ export function Loading({ text = "یک لحظه…" }: { text?: string }) {
 }
 
 /**
- * The numeric pad. Big keys, order the way a phone keypad is: ۷۸۹ on the top
- * row, because that is what the hand already knows.
+ * The numeric pad. Big keys, laid out the way a phone keypad is: ۱۲۳ on the top
+ * row reading from the right, then ۴۵۶, then ۷۸۹, with ۰ and the keys that act
+ * on the number underneath — because that is what the hand already knows.
  */
 export function NumPad({
   onKey,
@@ -404,7 +405,7 @@ export function NumPad({
   submitLabel?: string;
   extra?: ReactNode;
 }) {
-  const keys = ["۷", "۸", "۹", "۴", "۵", "۶", "۱", "۲", "۳", "۰", "٫", "⌫"];
+  const keys = ["۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "٫", "⌫"];
   return (
     <div className="numpad">
       <div className="numpad__grid">

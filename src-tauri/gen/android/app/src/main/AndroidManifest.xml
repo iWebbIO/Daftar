@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The app updates itself from its own release page; Android still asks
+         before installing, which is the point. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -10,8 +13,13 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.daftar"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
+        <!--
+          adjustResize: the keyboard shrinks the page instead of covering the
+          field the shopkeeper is typing into.
+        -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTask"
             android:label="@string/main_activity_title"
             android:name=".MainActivity"

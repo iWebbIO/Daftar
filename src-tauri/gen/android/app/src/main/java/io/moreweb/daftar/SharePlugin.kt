@@ -131,14 +131,58 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  /**
+   * `plugin:share|installApk` — hands a downloaded APK to Android's own
+   * installer.
+   *
+   * Android then asks him "install this app?" by itself. That dialog is the
+   * point of doing it this way: the app never installs anything silently, and
+   * if he has not yet allowed this app to install unknown apps, Android says so
+   * and offers the switch. `REQUEST_INSTALL_PACKAGES` in AndroidManifest.xml is
+   * what makes that dialog reachable at all.
+   */
+  @Command
+  fun installApk(invoke: Invoke) {
+    try {
+      val args: ShareArgs? = invoke.parseArgs(ShareArgs::class.java)
+      val path = args?.path?.trim().orEmpty()
+      if (path.isEmpty()) {
+        invoke.reject("فایلی برای نصب نیست")
+        return
+      }
+
+      val file = File(path)
+      if (!file.isFile) {
+        invoke.reject("فایل نصب پیدا نشد")
+        return
+      }
+
+      // The installer is another app: it reads the APK through a temporary
+      // grant, never through a file path.
+      val uri = FileProvider.getUriForFile(activity, authority, file)
+      val intent = Intent(Intent.ACTION_VIEW)
+      intent.setDataAndType(uri, "application/vnd.android.package-archive")
+      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      // The installer runs in its own task, so this one is required too.
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      open(intent, invoke)
+    } catch (ex: Exception) {
+      fail(invoke, ex)
+    }
+  }
+
   /** Opens the sheet on the UI thread, which is the only thread allowed to. */
   private fun launch(intent: Intent, invoke: Invoke) {
     val chooser = Intent.createChooser(intent, CHOOSER_TITLE)
     chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    open(chooser, invoke)
+  }
 
+  /** Starts one intent on the UI thread. */
+  private fun open(intent: Intent, invoke: Invoke) {
     activity.runOnUiThread {
       try {
-        activity.startActivity(chooser)
+        activity.startActivity(intent)
         invoke.resolve()
       } catch (ex: Exception) {
         fail(invoke, ex)
