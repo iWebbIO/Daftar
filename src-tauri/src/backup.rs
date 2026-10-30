@@ -116,7 +116,7 @@ pub fn now_with(ctx: &Ctx<'_>, t: &dyn Transport) -> Res<BackupInfo> {
             }
             Err(_) => (
                 false,
-                "نسخه پشتیبان ساخته شد ولی خوانده نشد".to_string(),
+                "نسخه پشتیبان روی گوشی هست، ولی فرستادنش نشد".to_string(),
             ),
         }
     };
@@ -138,11 +138,11 @@ fn status_with(ctx: &Ctx<'_>) -> Res<BackupInfo> {
     let size: i64 = db::get_setting(&conn, LAST_SIZE, "").parse().unwrap_or(0);
     let sent = db::get_setting(&conn, LAST_OK, "") == "1";
     let message = if at <= 0 {
-        "هنوز نسخه پشتیبانی گرفته نشده"
+        "هنوز پشتیبان نگرفته‌ای"
     } else if sent {
         "آخرین نسخه پشتیبان به تلگرام رفت"
     } else {
-        "آخرین نسخه پشتیبان فقط روی گوشی ذخیره شده"
+        "آخرین پشتیبان فقط روی گوشی است"
     };
     Ok(BackupInfo {
         at,
@@ -161,7 +161,7 @@ fn status_with(ctx: &Ctx<'_>) -> Res<BackupInfo> {
 /// ledger's life, which is what a backup has to be.
 fn snapshot(ctx: &Ctx<'_>) -> Res<PathBuf> {
     std::fs::create_dir_all(&ctx.state.dirs.files)
-        .map_err(|_| "پوشه فایل‌ها ساخته نشد".to_string())?;
+        .map_err(|_| "نسخه پشتیبان ذخیره نشد".to_string())?;
     let path = ctx.state.dirs.files.join(SNAPSHOT);
     // `VACUUM INTO` refuses to write over an existing file, and a leftover from
     // a backup that died halfway is stale by definition.
@@ -184,19 +184,19 @@ fn zip_snapshot(ctx: &Ctx<'_>, snapshot: &Path, at: i64) -> Res<PathBuf> {
     let mut bytes = Vec::new();
     std::fs::File::open(snapshot)
         .and_then(|mut file| file.read_to_end(&mut bytes))
-        .map_err(|_| "نسخه پشتیبان خوانده نشد".to_string())?;
+        .map_err(|_| "نسخه پشتیبان ذخیره نشد".to_string())?;
 
-    let file = std::fs::File::create(&path).map_err(|_| "فایل پشتیبان ساخته نشد".to_string())?;
+    let file = std::fs::File::create(&path).map_err(|_| "نسخه پشتیبان ذخیره نشد".to_string())?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     zip.start_file(IN_ZIP, options)
-        .map_err(|_| "فایل پشتیبان ساخته نشد".to_string())?;
+        .map_err(|_| "نسخه پشتیبان ذخیره نشد".to_string())?;
     zip.write_all(&bytes)
-        .map_err(|_| "نوشتن نسخه پشتیبان نشد".to_string())?;
+        .map_err(|_| "نسخه پشتیبان ذخیره نشد".to_string())?;
     let file = zip
         .finish()
-        .map_err(|_| "بستن نسخه پشتیبان نشد".to_string())?;
+        .map_err(|_| "نسخه پشتیبان ذخیره نشد".to_string())?;
     drop(file);
 
     let _ = std::fs::remove_file(snapshot);
@@ -263,7 +263,7 @@ fn record(ctx: &Ctx<'_>, info: &BackupInfo) -> Res<()> {
 }
 
 fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
-    serde_json::to_value(value).map_err(|_| "پاسخ ساخته نشد".to_string())
+    serde_json::to_value(value).map_err(|_| "مشکلی پیش آمد".to_string())
 }
 
 #[cfg(test)]
@@ -543,7 +543,7 @@ mod tests {
         let info = status_with(&bench.ctx()).unwrap();
         assert_eq!(info.at, 0);
         assert!(!info.sent);
-        assert_eq!(info.message, "هنوز نسخه پشتیبانی گرفته نشده");
+        assert_eq!(info.message, "هنوز پشتیبان نگرفته‌ای");
         assert!(bench.zips().is_empty(), "status makes no files");
 
         // After a real backup it reports that one.

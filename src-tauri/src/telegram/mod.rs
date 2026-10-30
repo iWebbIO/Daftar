@@ -23,7 +23,9 @@ const WAIT: Duration = Duration::from_secs(25);
 const LOOK: Duration = Duration::from_millis(1000);
 
 /// The sentence every Telegram op falls back to before the bot is wired up.
-const FIRST_WIRE: &str = "اول ربات تلگرام را وصل کنید";
+/// It names the screen, because a man holding a red toast needs to know where
+/// to go, not what is wrong.
+const FIRST_WIRE: &str = "ربات تلگرام وصل نیست؛ از تنظیمات وصلش کن";
 
 pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
@@ -74,7 +76,9 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
                 &rendered.file_name,
                 &bytes,
             ) {
-                Ok(()) => Ok(said(true, "فاکتور به تلگرام رفت")),
+                // The next thing he has to do is forward this to his customer,
+                // and nothing else on the screen will tell him.
+                Ok(()) => Ok(said(true, "فاکتور به تلگرام رفت؛ برای مشتری بفرستش")),
                 Err(e) => Ok(said(false, &client::scrub(&e, &token))),
             }
         })(),
@@ -110,7 +114,7 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
                 &rendered.file_name,
                 &bytes,
             ) {
-                Ok(()) => Ok(said(true, "صورت‌حساب به تلگرام رفت")),
+                Ok(()) => Ok(said(true, "صورت‌حساب به تلگرام رفت؛ برای مشتری بفرستش")),
                 Err(e) => Ok(said(false, &client::scrub(&e, &token))),
             }
         })(),
@@ -189,7 +193,9 @@ pub fn link_with(ctx: &Ctx<'_>, t: &dyn Transport, token: &str) -> Res<BotInfo> 
         std::thread::sleep(LOOK);
     }
 
-    Err("در ربات خود دکمهٔ Start را بزنید".to_string())
+    // The token was good enough to find the bot, so say that first: a man who
+    // has just pasted a long code needs to know the code is not the problem.
+    Err("ربات پیدا شد؛ فقط Start کم است".to_string())
 }
 
 /// Who the token belongs to: `getMe` in, `(username, name)` out.
@@ -356,7 +362,7 @@ fn token_arg(args: &Value) -> Res<String> {
         .map(str::trim)
         .unwrap_or("");
     if token.is_empty() {
-        return Err("توکن ربات را بزنید".to_string());
+        return Err("توکن ربات را بگذار".to_string());
     }
     Ok(token.to_string())
 }
@@ -372,7 +378,8 @@ fn said(ok: bool, message: &str) -> Value {
 }
 
 fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
-    serde_json::to_value(value).map_err(|_| "پاسخ ساخته نشد".to_string())
+    // The one internal failure that is not worth explaining to him.
+    serde_json::to_value(value).map_err(|_| "مشکلی پیش آمد".to_string())
 }
 
 #[cfg(test)]

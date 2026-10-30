@@ -151,7 +151,7 @@ export default function SettingsScreen() {
           <Row
             leading={<Icon name="send" />}
             title={s.chatId ? "وصل است" : "وصل نیست"}
-            sub={s.chatId ? "فاکتور و پشتیبان به تلگرام می‌رود" : "توکن ربات را بگذار تا وصل شود"}
+            sub={s.chatId ? undefined : "کد ربات را بگذار تا وصل شود"}
             value={s.chatId ? <Pill tone="pos">آماده</Pill> : <Pill tone="warn">نصب نشده</Pill>}
             onClick={() => setTokenSheet(true)}
           />
@@ -229,6 +229,9 @@ export default function SettingsScreen() {
         open={tokenSheet}
         onClose={() => setTokenSheet(false)}
         token={s.botToken}
+        onPersist={async (token) => {
+          await save({ botToken: token });
+        }}
         onSaved={async (token, chatId) => {
           await save({ botToken: token, chatId });
           setTokenSheet(false);
@@ -289,23 +292,31 @@ function UpdateCard() {
         <Row
           leading={<Icon name="today" />}
           title={info?.behind ? `نسخه ${digitsOf(info.latest)} آماده است` : "نسخه برنامه"}
-          sub={
-            info?.behind
-              ? "برای گرفتنش دکمه پایین را بزن"
-              : `نسخه ${digitsOf(info?.current ?? "۰.۱.۲")}`
-          }
+          sub={info ? (info.behind ? undefined : `نسخه ${digitsOf(info.current)}`) : undefined}
           value={info?.behind ? <Pill tone="warn">جدید</Pill> : undefined}
         />
-        <div style={{ padding: "4px 14px 12px" }}>
-          <Btn wide busy={busy} disabled={!inApp() || !info?.behind} onClick={install}>
-            دریافت و نصب
-          </Btn>
-          {note && (
-            <div className="tiny faint" style={{ marginTop: 8 }}>
-              {note}
-            </div>
-          )}
-        </div>
+        {info?.behind && (
+          <div style={{ padding: "4px 14px 12px" }}>
+            <Btn wide busy={busy} disabled={!inApp()} onClick={install}>
+              دریافت و نصب
+            </Btn>
+            {busy && (
+              <div className="tiny faint" style={{ marginTop: 8 }}>
+                دارم می‌گیرم…
+              </div>
+            )}
+            {note && (
+              <div className="tiny faint" style={{ marginTop: 8 }}>
+                {note}
+              </div>
+            )}
+          </div>
+        )}
+        {!info && (
+          <div className="tiny faint" style={{ padding: "0 14px 14px" }}>
+            الان نسخه‌ای برای گفتن نیست.
+          </div>
+        )}
       </Card>
     </>
   );
@@ -313,15 +324,18 @@ function UpdateCard() {
 
 const digitsOf = (v: string) => v.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]!);
 
-function TokenSheet({  open,
+function TokenSheet({
+  open,
   onClose,
   token,
   onSaved,
+  onPersist,
 }: {
   open: boolean;
   onClose: () => void;
   token: string;
   onSaved: (token: string, chatId: string) => Promise<void>;
+  onPersist: (token: string) => Promise<void>;
 }) {
   const [value, setValue] = useState(token);
   const [step, setStep] = useState<"token" | "start">("token");
@@ -339,12 +353,24 @@ function TokenSheet({  open,
   const connect = async () => {
     setBusy(true);
     setErr(null);
+    // First: is this code even right? That answers in a second, and a wrong code
+    // must never be presented as «now press Start» — he would wait for ever.
+    try {
+      await api.botCheck(value.trim());
+    } catch (e) {
+      setErr(errorText(e));
+      await onPersist(value.trim()).catch(() => undefined);
+      setBusy(false);
+      return;
+    }
+    // The code is good; tell him what to do *before* the slow wait begins.
+    setStep("start");
     try {
       const info = await api.botLink(value.trim());
       await onSaved(value.trim(), info.chatId ?? "");
     } catch (e) {
       setErr(errorText(e));
-      setStep("start");
+      await onPersist(value.trim()).catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -357,10 +383,10 @@ function TokenSheet({  open,
           <ol className="howto">
             <li>در تلگرام به BotFather پیام بده.</li>
             <li>با /newbot یک ربات بساز.</li>
-            <li>توکنی که می‌دهد را اینجا بگذار.</li>
+            <li>کدی که می‌دهد را اینجا بگذار.</li>
           </ol>
           <Field
-            label="توکن ربات"
+            label="کد ربات"
             value={value}
             onChange={setValue}
             placeholder="123456789:AA…"
@@ -374,12 +400,13 @@ function TokenSheet({  open,
       ) : (
         <>
           <p className="howto-p">
-            حالا در تلگرام ربات خودت را باز کن و دکمه <b>Start</b> را بزن. بعد اینجا دوباره
-            بزن.
+            کد درست است. حالا در تلگرام ربات خودت را باز کن و <b>Start</b> را بزن.
           </p>
+          {err && <div className="tiny" style={{ color: "var(--negative)" }}>{err}</div>}
           <Btn wide busy={busy} onClick={connect}>
             Start را زدم
           </Btn>
+          {busy && <div className="tiny faint" style={{ marginTop: 8 }}>دارم نگاه می‌کنم…</div>}
         </>
       )}
     </Sheet>

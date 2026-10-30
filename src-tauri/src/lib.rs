@@ -117,17 +117,18 @@ pub fn run() {
             });
 
             // The daily snapshot, and a check for a newer version: both on their
-            // own thread, both quiet, so a slow or missing network never delays
-            // the first screen.
+            // own thread, both quiet. The backup goes first on purpose — a check
+            // against a blocked GitHub can sit for fifteen seconds, and a closed
+            // app in that window would lose the day's copy.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let state = handle.state::<AppState>();
                 let ctx = Ctx { state: &state };
-                if let Some(info) = update::check(&ctx) {
-                    let _ = handle.emit("daftar://update", info);
-                }
                 if backup::due(&ctx) {
                     let _ = route(&ctx, "backup.now", &Value::Object(Default::default()));
+                }
+                if let Some(info) = update::check(&ctx) {
+                    let _ = handle.emit("daftar://update", info);
                 }
             });
 

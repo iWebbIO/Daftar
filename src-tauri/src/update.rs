@@ -98,7 +98,7 @@ impl Github for Http {
         answer
             .body_mut()
             .read_json::<Value>()
-            .map_err(|_| "پاسخ گیت‌هاب خوانده نشد".to_string())
+            .map_err(|_| "بررسی به‌روزرسانی نشد".to_string())
     }
 
     fn fetch(&self, url: &str, to: &Path) -> Res<i64> {
@@ -113,7 +113,7 @@ impl Github for Http {
         }
 
         let mut file =
-            std::fs::File::create(to).map_err(|_| "فایل نسخه جدید ساخته نشد".to_string())?;
+            std::fs::File::create(to).map_err(|_| "نسخه جدید دانلود نشد".to_string())?;
         // A stream, not a buffer: the APK never sits in memory whole.
         let mut body = answer.into_body().into_reader();
         let copied =
@@ -148,8 +148,8 @@ fn refusal(status: u16) -> String {
     match status {
         // GitHub answers 403 when the hourly limit is used up, and 404 while the
         // repository has no published release.
-        403 | 429 => "گیت‌هاب فعلاً پاسخ نمی‌دهد".to_string(),
-        404 => "نسخه جدید‌ای پیدا نشد".to_string(),
+        403 | 429 => "الان نمی‌توانم نسخه جدید را ببینم".to_string(),
+        404 => "نسخه جدیدی پیدا نشد".to_string(),
         _ => "بررسی به‌روزرسانی نشد".to_string(),
     }
 }
@@ -341,7 +341,7 @@ pub fn download_with(ctx: &Ctx<'_>, github: &dyn Github) -> Res<Downloaded> {
     let release = github.release()?;
     let info = evaluate(env!("CARGO_PKG_VERSION"), &release);
     if !info.behind {
-        return Err("نسخه جدید‌ای نیست".to_string());
+        return Err("نسخه جدیدی نیست".to_string());
     }
     let url = info
         .apk_url
@@ -352,7 +352,7 @@ pub fn download_with(ctx: &Ctx<'_>, github: &dyn Github) -> Res<Downloaded> {
     // another app's file list, and none of those need surprises.
     let name = format!("daftar-{}.apk", ascii_version(&info.latest));
     std::fs::create_dir_all(&ctx.state.dirs.files)
-        .map_err(|_| "پوشه فایل‌ها ساخته نشد".to_string())?;
+        .map_err(|_| "نسخه جدید ذخیره نشد".to_string())?;
     let part = ctx.state.dirs.files.join(format!("{name}.part"));
     let whole = ctx.state.dirs.files.join(&name);
 
@@ -413,7 +413,7 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
 }
 
 fn json_of<T: Serialize>(value: T) -> Res<Value> {
-    serde_json::to_value(value).map_err(|_| "پاسخ ساخته نشد".to_string())
+    serde_json::to_value(value).map_err(|_| "مشکلی پیش آمد".to_string())
 }
 
 /// A release, shaped the way GitHub sends it. Used by the tests and by nothing
@@ -549,11 +549,13 @@ mod tests {
             info.notes
         );
 
-        // A rate limit is the same shape, with its own sentence.
-        let limited = Stub::failing("گیت‌هاب فعلاً پاسخ نمی‌دهد");
+        // A rate limit is the same shape, with its own sentence. Nothing in it
+        // names a website he has never heard of.
+        let limited = Stub::failing("الان نمی‌توانم نسخه جدید را ببینم");
         let info = check_with(&limited);
         assert!(!info.behind);
-        assert!(info.notes.contains("گیت‌هاب"));
+        assert_eq!(info.notes, "الان نمی‌توانم نسخه جدید را ببینم");
+        assert!(!info.notes.contains("گیت"), "no English brand in his copy");
     }
 
     #[test]
@@ -625,7 +627,7 @@ mod tests {
         .with_bytes(b"old".to_vec());
 
         let why = download_with(&bench.ctx(), &github).unwrap_err();
-        assert_eq!(why, "نسخه جدید‌ای نیست");
+        assert_eq!(why, "نسخه جدیدی نیست");
         assert!(bench.files().is_empty());
     }
 

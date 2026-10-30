@@ -11,7 +11,7 @@ import "./today.css";
 
 export default function Today() {
   const nav = useNav();
-  const { toast } = useApp();
+  const { toast, settings } = useApp();
   const [view, setView] = useState<TodayView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +64,15 @@ export default function Today() {
       />
 
       <Body>
+        {/* The bot lives three taps away in settings; say it once here, where he
+            actually starts his day. */}
+        {!settings?.chatId && (
+          <button className="connectbot" onClick={() => nav.go({ name: "settings" })}>
+            <Icon name="send" size={17} />
+            <span>به تلگرام وصل نیست</span>
+          </button>
+        )}
+
         {/* The two numbers the whole book exists for. */}
         <button className="debts" onClick={() => nav.replace({ name: "parties" })}>
           <div className="debts__side debts__side--pos">

@@ -165,9 +165,9 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
       // The installer runs in its own task, so this one is required too.
       intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      open(intent, invoke)
+      open(intent, invoke, "نصب نشد")
     } catch (ex: Exception) {
-      fail(invoke, ex)
+      fail(invoke, ex, "نصب نشد")
     }
   }
 
@@ -179,23 +179,24 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
   }
 
   /** Starts one intent on the UI thread. */
-  private fun open(intent: Intent, invoke: Invoke) {
+  private fun open(intent: Intent, invoke: Invoke, refused: String = "فرستادن نشد") {
     activity.runOnUiThread {
       try {
         activity.startActivity(intent)
         invoke.resolve()
       } catch (ex: Exception) {
-        fail(invoke, ex)
+        fail(invoke, ex, refused)
       }
     }
   }
 
   /**
    * Logs what actually went wrong for whoever is debugging the phone, and tells
-   * the shopkeeper one short sentence in his own language.
+   * the shopkeeper one short sentence in his own language. The sentence says
+   * what he was trying to do — sending and installing are not the same thing.
    */
-  private fun fail(invoke: Invoke, ex: Exception) {
-    Log.e(LOG_TAG, "share failed", ex)
-    invoke.reject("فرستادن نشد")
+  private fun fail(invoke: Invoke, ex: Exception, refused: String = "فرستادن نشد") {
+    Log.e(LOG_TAG, "plugin failed", ex)
+    invoke.reject(refused)
   }
 }

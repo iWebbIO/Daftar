@@ -67,7 +67,7 @@ impl Transport for Https {
         answer
             .body_mut()
             .read_json::<Value>()
-            .map_err(|_| "پاسخ تلگرام خوانده نشد".to_string())
+            .map_err(|_| "جواب تلگرام را نفهمیدم".to_string())
     }
 
     fn post_file(
@@ -94,7 +94,7 @@ impl Transport for Https {
         answer
             .body_mut()
             .read_json::<Value>()
-            .map_err(|_| "پاسخ تلگرام خوانده نشد".to_string())
+            .map_err(|_| "جواب تلگرام را نفهمیدم".to_string())
     }
 }
 
@@ -144,16 +144,16 @@ pub fn refusal(code: i64, description: &str) -> String {
         || said.contains("blocked")
         || said.contains("kicked")
     {
-        return "ربات به گفتگو دسترسی ندارد".to_string();
+        return "ربات نتوانست پیام بفرستد؛ در تلگرام Start را بزن".to_string();
     }
     if code == 401 || said.contains("unauthorized") || said.contains("token") {
         return "توکن ربات درست نیست".to_string();
     }
     if code == 429 || said.contains("too many requests") {
-        return "تلگرام شلوغ است، کمی بعد دوباره بزنید".to_string();
+        return "تلگرام شلوغ است، کمی بعد دوباره بزن".to_string();
     }
     if said.contains("caption") && said.contains("long") {
-        return "متن فاکتور بلندتر از حد تلگرام است".to_string();
+        return "متن فاکتور برای تلگرام بلند است".to_string();
     }
     "تلگرام درخواست را نپذیرفت".to_string()
 }
@@ -164,8 +164,8 @@ fn net_error(e: ureq::Error) -> String {
     match e {
         ureq::Error::StatusCode(code) => match code {
             401 => "توکن ربات درست نیست".to_string(),
-            403 => "ربات به گفتگو دسترسی ندارد".to_string(),
-            429 => "تلگرام شلوغ است، کمی بعد دوباره بزنید".to_string(),
+            403 => "ربات نتوانست پیام بفرستد؛ در تلگرام Start را بزن".to_string(),
+            429 => "تلگرام شلوغ است، کمی بعد دوباره بزن".to_string(),
             _ => "به تلگرام وصل نشد".to_string(),
         },
         ureq::Error::Timeout(_)
