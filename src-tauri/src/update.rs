@@ -253,7 +253,7 @@ pub fn evaluate(current: &str, release: &Value) -> UpdateInfo {
 
 /// The check itself, without a network of its own: a stub here in the tests.
 pub fn check_with(github: &dyn Github) -> UpdateInfo {
-    let current = env!("CARGO_PKG_VERSION");
+    let current = env!("DAFTAR_VERSION");
     match github.release() {
         Ok(release) => evaluate(current, &release),
         // Not an error. The sentence says what happened and nothing else, and
@@ -278,7 +278,7 @@ pub fn check(ctx: &Ctx<'_>) -> Option<UpdateInfo> {
 }
 
 fn startup_with(ctx: &Ctx<'_>, github: &dyn Github) -> Option<UpdateInfo> {
-    let current = env!("CARGO_PKG_VERSION");
+    let current = env!("DAFTAR_VERSION");
 
     if let Some((latest, apk_url)) = cached(ctx) {
         return if newer(&latest, current) {
@@ -339,7 +339,7 @@ fn remember(ctx: &Ctx<'_>, info: &UpdateInfo) {
 /// is exactly what this avoids.
 pub fn download_with(ctx: &Ctx<'_>, github: &dyn Github) -> Res<Downloaded> {
     let release = github.release()?;
-    let info = evaluate(env!("CARGO_PKG_VERSION"), &release);
+    let info = evaluate(env!("DAFTAR_VERSION"), &release);
     if !info.behind {
         return Err("نسخه جدیدی نیست".to_string());
     }
@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn the_startup_check_is_infallible_and_can_answer_from_the_cache() {
         let bench = Bench::new("update-cache");
-        let current = env!("CARGO_PKG_VERSION");
+        let current = env!("DAFTAR_VERSION");
 
         // Offline, with nothing remembered: no answer, no panic, and nothing
         // gets written down — the next start should try again.
