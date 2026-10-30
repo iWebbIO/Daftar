@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "../api";
-import { fa, fmtAmount, parseAmount, UNITS } from "../format";
+import { currencyLabel, fa, fmtAmount, parseAmount, UNITS } from "../format";
 import { dayMonth } from "../jalali";
 import { useApp, useNav } from "../nav";
 import {
@@ -304,10 +304,10 @@ function ProductSheet({
         onChange={setSale}
         inputMode="numeric"
         placeholder="۰"
-        suffix="تومان"
+        suffix={currencyLabel()}
       />
       {saleValue !== null && saleValue > 0 && (
-        <div className="pr-echo num">{fmtAmount(saleValue)} تومان</div>
+        <div className="pr-echo num">{fmtAmount(saleValue)} {currencyLabel()}</div>
       )}
 
       <Field
@@ -316,7 +316,7 @@ function ProductSheet({
         onChange={setBuy}
         inputMode="numeric"
         placeholder="۰"
-        suffix="تومان"
+        suffix={currencyLabel()}
         onEnter={() => void save()}
       />
 

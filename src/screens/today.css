@@ -33,7 +33,7 @@
 
 .debts__side {
   flex: 1;
-  padding: 0 14px;
+  padding: 0 12px;
   min-width: 0;
 }
 
@@ -50,10 +50,15 @@
 }
 
 .debts__num {
-  font-size: 25px;
+  /* Sized so a nine-digit figure still fits when the shop works in ریال, where
+     every number carries one more digit than the same money in تومان. */
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.15;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 .debts__side--pos .debts__num {

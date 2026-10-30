@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "../api";
-import { fa, fmtAmount, fmtQty, lineTotal, parseAmount, parseQty } from "../format";
+import { currencyLabel, fa, fmtAmount, fmtQty, lineTotal, parseAmount, parseQty } from "../format";
 import { today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { Doc, LineInput, Party, PartyCard, Product } from "../types";
@@ -591,7 +591,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         <div className="ord-total__main">
           <span className="ord-total__label">جمع</span>
           <span className="ord-total__num num">{fmtAmount(total)}</span>
-          <span className="ord-total__unit">تومان</span>
+          <span className="ord-total__unit">{currencyLabel()}</span>
         </div>
         {(discount !== 0 || rounding !== 0) && (
           <div className="ord-total__meta">

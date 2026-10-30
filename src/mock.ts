@@ -271,7 +271,11 @@ function seed(): Store {
       roundStep: 0,
       botToken: "",
       chatId: "",
-      currency: "toman",
+      // So the preview can be looked at in either unit: ?currency=rial
+      currency:
+        new URLSearchParams(globalThis.location?.search ?? "").get("currency") === "rial"
+          ? "rial"
+          : "toman",
       backupHour: 21,
       lastBackupAt: now() - 1000 * 60 * 60 * 20,
       theme: "light",

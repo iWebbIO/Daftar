@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, errorText } from "../api";
-import { fmtAmount, fa, latin, parseAmount } from "../format";
+import { currencyLabel, fmtAmount, fa, latin, parseAmount } from "../format";
 import { dayMonth } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { Payment, PartyBook, TimelineItem } from "../types";
@@ -300,7 +300,7 @@ export default function Party(props: { id: number }) {
               <span className={`sheet-money__num num tone-${pay.direction === "out" ? "neg" : "pos"}`}>
                 {fmtAmount(pay.amount)}
               </span>
-              <span className="sheet-money__unit">تومان</span>
+              <span className="sheet-money__unit">{currencyLabel()}</span>
             </div>
             <Divider />
             <Row title="تاریخ" value={dayMonth(pay.day)} />
@@ -373,7 +373,7 @@ export default function Party(props: { id: number }) {
           onChange={setOpening}
           inputMode="numeric"
           placeholder="۰"
-          suffix="تومان"
+          suffix={currencyLabel()}
         />
         <Btn wide busy={busy} disabled={!name.trim()} onClick={saveEdit}>
           ذخیره

@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { fa, fmtAmount, parseAmount } from "../format";
+import { currencyLabel, fa, fmtAmount, parseAmount } from "../format";
 import { dayMonth, longDate, relativeDay, today, weekday } from "../jalali";
 import { useApp, useNav } from "../nav";
 import {
@@ -231,7 +231,7 @@ function ChequeSheet({
         <div className={`ch-big__num num ${incoming ? "is-pos" : "is-neg"}`}>
           {fmtAmount(cheque.amount)}
         </div>
-        <div className="ch-big__unit">تومان</div>
+        <div className="ch-big__unit">{currencyLabel()}</div>
         <div className="ch-big__meta">
           {cheque.bank ?? "چک"} · سررسید {longDate(cheque.dueDay)}
         </div>
@@ -369,9 +369,9 @@ function AddCheque({
         onChange={setAmount}
         inputMode="numeric"
         placeholder="۰"
-        suffix="تومان"
+        suffix={currencyLabel()}
       />
-      {value !== null && value > 0 && <div className="ch-echo num">{fmtAmount(value)} تومان</div>}
+      {value !== null && value > 0 && <div className="ch-echo num">{fmtAmount(value)} {currencyLabel()}</div>}
 
       <Field label="بانک" value={bank} onChange={setBank} placeholder="مثلاً ملت" />
 

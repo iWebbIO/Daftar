@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { fa, fmtAmount, parseAmount } from "../format";
+import { currencyLabel, fa, fmtAmount, parseAmount } from "../format";
 import { today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { AllocationInput, Party, PartyBook, PartyCard } from "../types";
@@ -221,7 +221,7 @@ export default function Payment(props: { partyId?: number }) {
               <div className="pay-amount">
                 <span className="pay-amount__label">مبلغ</span>
                 <span className="pay-amount__num num">{fmtAmount(amount)}</span>
-                <span className="pay-amount__unit">تومان</span>
+                <span className="pay-amount__unit">{currencyLabel()}</span>
               </div>
 
               <div

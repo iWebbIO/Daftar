@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { fa, fmtAmount, latin } from "../format";
+import { currencyLabel, fa, fmtAmount, latin } from "../format";
 import { longDate, today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import {
@@ -267,7 +267,7 @@ function SheetEditor({ id, onBack }: { id?: number; onBack?: () => void }) {
             <div className="sm-box">
               <div className="sm-box__label">جمع</div>
               <div className="sm-box__num num">{fmtAmount(total)}</div>
-              <div className="sm-box__unit">تومان</div>
+              <div className="sm-box__unit">{currencyLabel()}</div>
             </div>
             {struck > 0 && <div className="sm-note">{fa(struck)} ردیف خط خورده</div>}
           </>
@@ -340,7 +340,7 @@ function RowSheet({
       <div className="sm-amount">
         <div className="sm-amount__label">مبلغ</div>
         <div className="sm-amount__num num">{fmtAmount(amount)}</div>
-        <div className="sm-amount__unit">تومان</div>
+        <div className="sm-amount__unit">{currencyLabel()}</div>
       </div>
 
       <NumPad onKey={key} onSubmit={() => commit(false)} submitLabel={existing ? "ثبت" : "افزودن"} />

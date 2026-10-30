@@ -23,6 +23,7 @@ const sizeArg = args.find((a) => a.startsWith("--size="));
 const [w, h] = (sizeArg ? sizeArg.split("=")[1] : "390x844").split("x").map(Number);
 const names = args.filter((a) => !a.startsWith("--"));
 const base = process.env.BASE_URL ?? "http://127.0.0.1:5183/";
+const query = process.env.QUERY ?? "";
 
 mkdirSync(".shots", { recursive: true });
 
@@ -47,7 +48,7 @@ for (const name of shots) {
   const [route, param] = name.split(":");
   index += 1;
   // A fresh document per shot: a hash-only change would not remount the app.
-  await page.goto(`${base}?shot=${index}#${route}${param ? `/${param}` : ""}`, {
+  await page.goto(`${base}?shot=${index}${query}#${route}${param ? `/${param}` : ""}`, {
     waitUntil: "domcontentloaded",
   });
   await page.evaluate(() => document.fonts.ready);

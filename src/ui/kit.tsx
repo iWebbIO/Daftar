@@ -4,7 +4,7 @@
 // on the left of each row, because that is what a shopkeeper reads first.
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { fmtAmount, fmtQty } from "../format";
+import { currencyLabel, fmtAmount, fmtQty } from "../format";
 import "./kit.css";
 
 // ---------------------------------------------------------------- structure
@@ -148,7 +148,7 @@ export function Money({
   return (
     <span className={`money num money--${size} tone-${resolved}`}>
       {fmtAmount(value)}
-      {unit && <span className="money__unit"> تومان</span>}
+      {unit && <span className="money__unit"> {currencyLabel()}</span>}
     </span>
   );
 }
@@ -186,7 +186,7 @@ export function Balance({ value }: { value: number }) {
     <div className={`balance ${owes ? "balance--pos" : "balance--neg"}`}>
       <div className="balance__word">{owes ? "طلب شما" : "بدهی شما"}</div>
       <div className="balance__num num">{fmtAmount(Math.abs(value))}</div>
-      <div className="balance__unit">تومان</div>
+      <div className="balance__unit">{currencyLabel()}</div>
     </div>
   );
 }
