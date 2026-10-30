@@ -898,7 +898,7 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
       const hits: SearchHit[] = [];
       for (const p of s.parties) {
         if (p.name.includes(q)) {
-          hits.push({ kind: "party", id: p.id, title: p.name, subtitle: "طرف‌حساب", amount: balanceOf(p.id) });
+          hits.push({ kind: "party", id: p.id, title: p.name, subtitle: "طرف حساب", amount: balanceOf(p.id) });
         }
       }
       for (const p of s.products) {

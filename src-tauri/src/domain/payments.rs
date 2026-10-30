@@ -128,7 +128,7 @@ fn checked_plan(
         }
         let doc = orders::load(conn, allocation.doc_id)?;
         if doc.party_id != input.party_id {
-            return Err("این فاکتور مال همین طرف‌حساب نیست".to_string());
+            return Err("این فاکتور مال همین طرف حساب نیست".to_string());
         }
         if doc.kind != kind {
             return Err("این فاکتور با این پرداخت جور نیست".to_string());
@@ -191,7 +191,7 @@ pub fn record(conn: &Connection, input: &PaymentInput, auto: bool) -> Res<Paymen
                 return Err("این پرداخت باطل شده و عوض نمی‌شود".to_string());
             }
             if old.party_id != input.party_id {
-                return Err("این پرداخت مال همین طرف‌حساب نیست".to_string());
+                return Err("این پرداخت مال همین طرف حساب نیست".to_string());
             }
             for doc_id in allocated_docs(conn, id)? {
                 touched.insert(doc_id);
@@ -590,7 +590,7 @@ mod tests {
         };
         assert_eq!(
             save(&conn, &elsewhere).unwrap_err(),
-            "این فاکتور مال همین طرف‌حساب نیست".to_string()
+            "این فاکتور مال همین طرف حساب نیست".to_string()
         );
 
         assert!(save(&conn, &payment(id, "in", 0, day(11))).is_err());

@@ -198,7 +198,7 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
         })(),
         "share.statementText" => (|| {
             let a: PartyArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "طرف‌حساب خوانده نشد".to_string())?;
+                .map_err(|_| "طرف حساب خوانده نشد".to_string())?;
             let conn = ctx.conn()?;
             let text = statement_text(&conn, a.party_id)?;
             let _ = db::today();

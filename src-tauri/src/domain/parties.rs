@@ -41,8 +41,8 @@ pub fn party_of(conn: &Connection, id: i64) -> Res<Party> {
         from_row,
     )
     .optional()
-    .map_err(|e| crate::db::oops("خواندن طرف‌حساب نشد", e))?
-    .ok_or_else(|| "طرف‌حساب پیدا نشد".to_string())
+    .map_err(|e| crate::db::oops("خواندن طرف حساب نشد", e))?
+    .ok_or_else(|| "طرف حساب پیدا نشد".to_string())
 }
 
 /// The search text as a shopkeeper types it: any digit style, either yeh or kaf,
@@ -113,12 +113,12 @@ fn cards(conn: &Connection) -> Res<Vec<PartyCard>> {
     let open = open_counts(conn)?;
     let mut stmt = conn
         .prepare(&format!("SELECT {PARTY_COLUMNS} FROM party p ORDER BY p.name"))
-        .map_err(|e| crate::db::oops("خواندن طرف‌حساب‌ها نشد", e))?;
+        .map_err(|e| crate::db::oops("خواندن طرف حساب‌ها نشد", e))?;
     let rows = stmt
         .query_map([], from_row)
-        .map_err(|e| crate::db::oops("خواندن طرف‌حساب‌ها نشد", e))?
+        .map_err(|e| crate::db::oops("خواندن طرف حساب‌ها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| crate::db::oops("خواندن طرف‌حساب‌ها نشد", e))?;
+        .map_err(|e| crate::db::oops("خواندن طرف حساب‌ها نشد", e))?;
     Ok(rows
         .into_iter()
         .map(|party| PartyCard {
@@ -259,7 +259,7 @@ pub fn save(conn: &Connection, input: &PartyInput) -> Res<Party> {
                         id
                     ],
                 )
-                .map_err(|e| crate::db::oops("ذخیره طرف‌حساب نشد", e))?;
+                .map_err(|e| crate::db::oops("ذخیره طرف حساب نشد", e))?;
                 db::audit(
                     conn,
                     "party",
@@ -292,7 +292,7 @@ pub fn save(conn: &Connection, input: &PartyInput) -> Res<Party> {
                         now
                     ],
                 )
-                .map_err(|e| crate::db::oops("ذخیره طرف‌حساب نشد", e))?;
+                .map_err(|e| crate::db::oops("ذخیره طرف حساب نشد", e))?;
                 let id = conn.last_insert_rowid();
                 db::audit(
                     conn,
@@ -690,7 +690,7 @@ mod tests {
         assert!(save(&conn, &missing).is_err());
         assert_eq!(
             party_of(&conn, 404).unwrap_err(),
-            "طرف‌حساب پیدا نشد".to_string()
+            "طرف حساب پیدا نشد".to_string()
         );
 
         // an edit keeps the number, changes the words
@@ -761,7 +761,7 @@ mod tests {
             handle(&ctx, "parties.get", &json!({"id": 404}))
                 .unwrap()
                 .unwrap_err(),
-            "طرف‌حساب پیدا نشد"
+            "طرف حساب پیدا نشد"
         );
     }
 

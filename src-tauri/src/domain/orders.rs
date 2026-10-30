@@ -219,7 +219,7 @@ fn resolve_line(conn: &Connection, line: &LineInput) -> Res<(Option<i64>, String
         other => other.to_string(),
     };
     if name.trim().is_empty() {
-        return Err("نام کالا را بنویسید".to_string());
+        return Err("نام کالا را بنویس".to_string());
     }
     let unit = match line.unit.trim() {
         "" => catalog
@@ -244,7 +244,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
         _ => return Err("نوع فاکتور نامشخص است".to_string()),
     };
     if input.discount < 0 {
-        return Err("تخفیف را درست وارد کنید".to_string());
+        return Err("تخفیف را درست بزن".to_string());
     }
     if input.lines.is_empty() {
         return Err("چیزی به فاکتور اضافه نشده".to_string());
@@ -546,7 +546,7 @@ pub fn refresh_status(conn: &Connection, doc_id: i64) -> Res<()> {
 pub fn void(conn: &Connection, id: i64, reason: &str) -> Res<Doc> {
     let reason = reason.trim().to_string();
     if reason.is_empty() {
-        return Err("دلیلش را بنویسید".to_string());
+        return Err("دلیلش را بنویس".to_string());
     }
     in_tx(conn, |conn| {
         let doc = load(conn, id)?;
@@ -724,7 +724,7 @@ pub fn list(
 // ---------------------------------------------------------------------------
 
 fn read<T: serde::de::DeserializeOwned>(args: &Value) -> Res<T> {
-    serde_json::from_value(args.clone()).map_err(|_| "ورودی خوانده نشد".to_string())
+    serde_json::from_value(args.clone()).map_err(|_| "فاکتور خوانده نشد".to_string())
 }
 
 fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
@@ -773,7 +773,7 @@ fn doc_input(args: &Value) -> Res<DocInput> {
         fields.entry("receivedMethod").or_insert(Value::from("cash"));
         fields.entry("updatePrices").or_insert(Value::Bool(false));
     }
-    serde_json::from_value(input).map_err(|_| "ورودی خوانده نشد".to_string())
+    serde_json::from_value(input).map_err(|_| "فاکتور خوانده نشد".to_string())
 }
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -1277,12 +1277,12 @@ mod tests {
             serde_json::from_value(call("orders.void", json!({"id": saved.id, "reason": "غلط بود"}))).unwrap();
         assert_eq!(crossed.status, "void");
 
-        // no reason, no crossing out — and the sentence is Persian
+        // no reason, no crossing out — and the sentence speaks the way he does
         assert_eq!(
             handle(&ctx, "orders.void", &json!({"id": saved.id, "reason": "  "}))
                 .unwrap()
                 .unwrap_err(),
-            "دلیلش را بنویسید"
+            "دلیلش را بنویس"
         );
     }
 

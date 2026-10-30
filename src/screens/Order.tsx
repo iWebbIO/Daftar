@@ -156,28 +156,16 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
     })();
   }, [party, props.kind]);
 
-  // Recent customers while nobody is chosen yet. The people this paper is
-  // usually written for come first: a customer on a sale, a supplier on a
-  // purchase.
+  // Recent customers while nobody is chosen yet: the six people the book saw
+  // last, in the order `parties.suggest` knows them — the person he is writing
+  // for now is almost always the person he wrote for last, whatever his kind.
   useEffect(() => {
     if (party) return;
     let alive = true;
-    const rank = (kind: string) =>
-      selling
-        ? kind === "customer"
-          ? 0
-          : kind === "both"
-            ? 1
-            : 2
-        : kind === "supplier"
-          ? 0
-          : kind === "both"
-            ? 1
-            : 2;
     void (async () => {
       try {
         const rows = await api.partiesSuggest(pq.trim());
-        if (alive) setHits([...rows].sort((a, b) => rank(a.party.kind) - rank(b.party.kind)));
+        if (alive) setHits(rows);
       } catch {
         if (alive) setHits([]);
       }
@@ -185,7 +173,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
     return () => {
       alive = false;
     };
-  }, [pq, party, selling]);
+  }, [pq, party]);
 
   // Keep the newest line in sight as the page fills.
   useEffect(() => {
@@ -301,7 +289,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         return;
       }
       case "money":
-        void save();
+        void save(entered);
         return;
       default:
         return;
@@ -335,7 +323,10 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
       voided: l.voided,
     }));
 
-  const save = async () => {
+  /** `received` is the money that actually changed hands in this save: what he
+      typed at the counter on a new paper, nothing at all on an edit — a
+      correction never moves cash. */
+  const save = async (received: number) => {
     if (!party || busy) return;
     setBusy(true);
     try {
@@ -349,13 +340,15 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         note: doc?.note ?? null,
         final,
         lines: buildLines(),
-        receivedNow: entered,
+        receivedNow: received,
         receivedMethod: method,
         updatePrices: false,
       });
-      toast(id ? "فاکتور ذخیره شد" : "فاکتور ثبت شد", "ok");
+      const paper = selling ? "فاکتور" : "خرید";
+      toast(id ? `${paper} ذخیره شد` : `${paper} ثبت شد`, "ok");
       // The invoice is not finished until it is in the customer's hands: land him
-      // on the page that has the send button, not back on the day's list.
+      // on the page that has the send button, not back on the day's list. An
+      // edit goes back where it came from, because that paper is already out.
       if (!id) nav.replace({ name: "invoice", docId: saved.id });
       else if (nav.canGoBack) nav.back();
       else nav.replace({ name: "today" });
@@ -402,6 +395,14 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Which line the keypad is holding: «سطر ۲ · عدس», or «سطر تازه» for one
+      that has not landed on the page yet. Two lines of the same thing are
+      otherwise indistinguishable while a number is being typed. */
+  const lineLabel = (key: number, name: string) => {
+    const at = lines.findIndex((l) => l.key === key);
+    return at < 0 ? `سطر تازه · ${name}` : `سطر ${fa(at + 1)} · ${name}`;
   };
 
   // -------------------------------------------------------------- rendering
@@ -475,10 +476,17 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
       {/* ---- the customer, before anything else ---- */}
       {!party ? (
         <div className="ord-mid ord-mid--pad scroll">
-          <Field value={pq} onChange={setPq} placeholder="نام مشتری…" />
+          {/* The first tap is the name he is about to type, so the field is
+              already holding the cursor when the screen arrives. */}
+          <Field
+            value={pq}
+            onChange={setPq}
+            placeholder={selling ? "نام مشتری…" : "نام فروشنده…"}
+            autoFocus
+          />
           <Btn variant="ghost" wide onClick={() => setAdding(true)}>
             <Icon name="plus" size={18} />
-            مشتری جدید
+            {selling ? "مشتری جدید" : "فروشنده جدید"}
           </Btn>
           {hits.length > 0 && (
             <Card tight>
@@ -499,12 +507,16 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         /* ---- how much of it he paid at the counter ---- */
         <div className="ord-mid ord-ask">
           <div className="ord-ask__mid">
-            <div className="ord-ask__q">حالا پول گرفتی؟</div>
+            <div className="ord-ask__q">{selling ? "حالا پول گرفتی؟" : "حالا پول دادی؟"}</div>
             <div className="ord-ask__num num">{fmtAmount(entered)}</div>
             <div className={`ord-ask__left ${left === 0 ? "is-clear" : ""}`}>
               {left > 0 ? `مانده ${fmtAmount(left)}` : "تسویه شد"}
             </div>
-            {entered > total && <div className="ord-ask__over">اضافه‌اش به حسابش می‌ماند</div>}
+            {entered > total && (
+              <div className="ord-ask__over">
+                {selling ? "اضافه‌اش به حسابش می‌ماند" : "اضافه‌اش طلبکاریت می‌شود"}
+              </div>
+            )}
             <Segmented
               options={[
                 { value: "cash", label: "نقد" },
@@ -528,8 +540,14 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
                       key={l.key}
                       title={l.name}
                       sub={`${fmtQty(l.qtyMilli)} ${l.unit} × ${fmtAmount(l.price)}`}
-                      value={fmtAmount(l.overrideTotal ?? lineTotal(l.qtyMilli, l.price))}
-                      note={l.overrideTotal !== null ? "جمع دستی" : undefined}
+                      // A crossed-out line shows no money at all: the amount is
+                      // what the eye lands on first, and it is not being charged.
+                      value={
+                        l.voided
+                          ? undefined
+                          : fmtAmount(l.overrideTotal ?? lineTotal(l.qtyMilli, l.price))
+                      }
+                      note={l.voided ? "خط خورده" : l.overrideTotal !== null ? "جمع دستی" : undefined}
                       struck={l.voided}
                       onClick={() => setLook(l)}
                     />
@@ -616,10 +634,13 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
           <span className="ord-total__num num">{fmtAmount(total)}</span>
           <span className="ord-total__unit">{currencyLabel()}</span>
         </div>
-        {(discount !== 0 || rounding !== 0) && (
+        {(discount !== 0 || rounding !== 0 || asked) && (
           <div className="ord-total__meta">
             {discount !== 0 && <span>تخفیف {fmtAmount(-discount)}</span>}
             {rounding !== 0 && <span>رند {fmtAmount(rounding)}</span>}
+            {/* The money step covers the middle of the page, so what is still
+                owed stays here, under the total, until it is settled. */}
+            {asked && <span>{left > 0 ? `مانده ${fmtAmount(left)}` : "تسویه شد"}</span>}
           </div>
         )}
         {!writing && (
@@ -649,12 +670,18 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
               busy={busy}
               disabled={!party || lines.every((l) => l.voided)}
               onClick={() => {
+                // A paper already in the book is being corrected, not written:
+                // no money changes hands now, so «حفظ» saves straight away.
+                if (id) {
+                  void save(0);
+                  return;
+                }
                 setDigits("");
                 setFresh(true);
                 setPad({ mode: "money" });
               }}
             >
-              ثبت
+              {id ? "حفظ" : "ثبت"}
             </Btn>
           </>
         )}
@@ -667,7 +694,9 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
             <div className="ord-pad__shot">
               {pad.mode !== "discount" && (
                 <span className="ord-pad__who">
-                  {pad.mode === "override" ? pad.name : pad.line.name}
+                  {pad.mode === "override"
+                    ? lineLabel(pad.key, pad.name)
+                    : lineLabel(pad.line.key, pad.line.name)}
                 </span>
               )}
               <div className="ord-pad__nums">
@@ -712,7 +741,9 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
                 : pad.mode === "price"
                   ? "سطر شد"
                   : pad.mode === "money"
-                    ? "ثبت"
+                    ? id
+                      ? "حفظ"
+                      : "ثبت"
                     : "تایید"
             }
           />
@@ -786,15 +817,17 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
       </Sheet>
 
       {/* ---- a new customer, with nothing but a name ---- */}
-
-
-      <Sheet open={adding} onClose={() => setAdding(false)} title="مشتری جدید">
+      <Sheet
+        open={adding}
+        onClose={() => setAdding(false)}
+        title={selling ? "مشتری جدید" : "فروشنده جدید"}
+      >
         <Field
           label="نام"
           value={newName}
           onChange={setNewName}
           autoFocus
-          placeholder="مثلاً مادر زهرا"
+          placeholder={selling ? "مثلاً مادر زهرا" : "مثلاً حاج آقا"}
         />
         <Btn wide busy={busy} disabled={!newName.trim()} onClick={() => void createParty()}>
           بساز
