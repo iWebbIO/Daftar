@@ -1402,9 +1402,109 @@ fn stamp_footer(pages: &mut [Page], note: &str) {
     }
 }
 
+/// The audit a pair of eyes does, written down: nothing off the paper, nothing
+/// printed on top of anything else. `cargo test` runs it over every sample.
+#[cfg(test)]
+pub(super) fn page_lint(what: &str, pages: &[Page]) {
+    for (n, page) in pages.iter().enumerate() {
+        let mut runs: Vec<(f32, f32, f32)> = Vec::new();
+        for item in &page.items {
+            match item {
+                Item::Rule(rule) => {
+                    assert!(
+                        rule.x0 >= LEFT - 0.6 && rule.x1 <= RIGHT + 0.6,
+                        "{what} p{}: a rule runs off the paper",
+                        n + 1
+                    );
+                }
+                Item::Frame(frame) => {
+                    assert!(
+                        frame.x0 >= LEFT - 0.6 && frame.x1 <= RIGHT + 0.6,
+                        "{what} p{}: a frame runs off the paper",
+                        n + 1
+                    );
+                }
+                Item::Text(text) => {
+                    assert!(
+                        text.x >= LEFT - 0.6,
+                        "{what} p{}: «{}» starts left of the margin at {}",
+                        n + 1,
+                        text.class.name(),
+                        text.x
+                    );
+                    assert!(
+                        text.x + text.width <= RIGHT + 0.6,
+                        "{what} p{}: «{}» runs past the right margin to {}",
+                        n + 1,
+                        text.class.name(),
+                        text.x + text.width
+                    );
+                    assert!(
+                        (20.0..=585.0).contains(&text.baseline),
+                        "{what} p{}: a line sits at {}",
+                        n + 1,
+                        text.baseline
+                    );
+                    if !text.glyphs.is_empty() {
+                        runs.push((text.baseline, text.x, text.x + text.width));
+                    }
+                }
+            }
+        }
+
+        // Two runs on the same baseline must not overlap — that is what a
+        // column running into its neighbour looks like.
+        runs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        for i in 0..runs.len() {
+            for j in (i + 1)..runs.len() {
+                let (base, x0, x1) = runs[i];
+                let (other, y0, y1) = runs[j];
+                if (other - base).abs() > 0.5 {
+                    break;
+                }
+                assert!(
+                    x1 <= y0 + 0.6 || y1 <= x0 + 0.6,
+                    "{what} p{}: two runs collide at baseline {base}",
+                    n + 1
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn lint(what: &str, pages: &[Page]) {
+        page_lint(what, pages);
+    }
+
+    fn statement_with(rows: Vec<StatementRow>, balance: i64) -> StatementData {
+        StatementData {
+            shop: Shop {
+                name: "فروشگاه دایی مراد".to_string(),
+                phone: "۰۲۱-۵۵۴۴۳۳۲۲".to_string(),
+                address: "تهران، بازار آهنگرها، پلاک ۱۲".to_string(),
+                note: "جنس فروخته‌شده تا ۳ روز قابل تعویض است.".to_string(),
+                ..Shop::default()
+            },
+            party_name: "حاج‌آقا رضایی".to_string(),
+            day: crate::jalali::j2d(1404, 8, 8),
+            balance,
+            rows,
+        }
+    }
+
+    fn row(n: i64, voided: bool) -> StatementRow {
+        StatementRow {
+            day: Some(crate::jalali::j2d(1404, 8, 8) - n * 7),
+            title: format!("فاکتور فروش {}", fa_digits(&n.to_string())),
+            amount: 1_000 * n,
+            remaining: Some(1_000 * n),
+            voided,
+        }
+    }
 
     #[test]
     fn a_long_description_is_trimmed_not_overflowed() {
@@ -1420,6 +1520,100 @@ mod tests {
         assert_eq!(unit_fa("piece"), "عدد");
         assert_eq!(unit_fa(""), "");
         assert_eq!(unit_fa("کیلو"), "کیلو");
+    }
+
+    #[test]
+    fn a_statement_holds_together_with_one_row_or_forty() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-out");
+        std::fs::create_dir_all(&out).ok();
+
+        // The same page has to work for a single purchase and for a year of
+        // them, and the ask has to land in the same place on both.
+        let one = statement_with(vec![row(1, false)], 1_000);
+        let many = statement_with((1..=40).rev().map(|n| row(n, false)).collect(), 820_000);
+
+        for (name, data) in [("statement-one", &one), ("statement-forty", &many)] {
+            let pages = statement_pages(data);
+            lint(name, &pages);
+            let last = pages.last().expect("a page");
+            let ask = last
+                .items
+                .iter()
+                .rev()
+                .find_map(|item| match item {
+                    Item::Text(text) if text.class == Class::Total => Some(text.baseline),
+                    _ => None,
+                })
+                .expect("the ask");
+            assert!(
+                ask > BOTTOM - 20.0,
+                "{name}: the ask belongs at the foot, not at {ask}"
+            );
+            std::fs::write(out.join(format!("{name}.pdf")), super::super::pdf::render(&pages))
+                .unwrap();
+            std::fs::write(out.join(format!("{name}.svg")), super::super::svg::render(&pages))
+                .unwrap();
+        }
+
+        assert_eq!(statement_pages(&one).len(), 1);
+        assert!(statement_pages(&many).len() > 1, "forty rows need more paper");
+    }
+
+    #[test]
+    fn a_cancelled_invoice_stays_on_the_statement_struck_through() {
+        let data = statement_with(
+            vec![
+                row(3, false),
+                row(2, true),
+                row(1, false),
+            ],
+            2_000,
+        );
+        let pages = statement_pages(&data);
+        lint("statement-voided", &pages);
+
+        let page = &pages[0];
+        let strikes = page
+            .items
+            .iter()
+            .filter(|item| matches!(item, Item::Rule(rule) if rule.width == 0.5))
+            .count();
+        assert_eq!(strikes, 1, "one cancelled invoice, one strike");
+        // The row is still there: three dates for three documents.
+        let rows = page
+            .items
+            .iter()
+            .filter(|item| matches!(item, Item::Text(text) if text.class == Class::Row))
+            .count();
+        assert!(rows >= 9, "every document keeps its row: {rows}");
+
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-out");
+        std::fs::write(out.join("statement-voided.pdf"), super::super::pdf::render(&pages)).unwrap();
+        std::fs::write(out.join("statement-voided.svg"), super::super::svg::render(&pages)).unwrap();
+    }
+
+    #[test]
+    fn a_settled_statement_still_arrives_and_says_so() {
+        let data = statement_with(vec![row(1, false)], 0);
+        let pages = statement_pages(&data);
+        lint("statement-settled", &pages);
+        assert_eq!(owed_phrase(data.balance), "حساب تسویه است");
+        // A customer with a zero balance still gets a page with everything on
+        // it — the rows he paid, and the words that say he owes nothing.
+        let ask = pages[0]
+            .items
+            .iter()
+            .rev()
+            .find_map(|item| match item {
+                Item::Text(text) if text.class == Class::Total => Some(text),
+                _ => None,
+            })
+            .expect("the ask");
+        assert_eq!(ask.size, 8.6, "the words line closes the sheet");
+
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-out");
+        std::fs::write(out.join("statement-settled.pdf"), super::super::pdf::render(&pages)).unwrap();
+        std::fs::write(out.join("statement-settled.svg"), super::super::svg::render(&pages)).unwrap();
     }
 
     #[test]
@@ -1448,17 +1642,74 @@ mod tests {
                 title: "فاکتور فروش ۱۲".to_string(),
                 amount: 5_175,
                 remaining: Some(5_175),
+                voided: false,
             }],
         };
         let draw = |balance| {
             let pages = statement_pages(&data(balance));
             super::super::svg::render(&pages)
         };
-        // «طلب شما از ایشان» and «بدهی شما به ایشان» are different words, so
-        // the two sheets cannot be the same drawing.
+        // The three phrases say different things, so the sheets cannot be the
+        // same drawing.
         assert_ne!(draw(5_175), draw(-5_175));
         assert_ne!(draw(5_175), draw(0));
         assert!(draw(0).contains("</svg>"));
+
+        // ...and the words are the ones the customer is owed in.
+        assert_eq!(owed_phrase(5_175), "طلب ما از شماست");
+        assert_eq!(owed_phrase(-5_175), "طلب شما از ماست");
+        assert_eq!(owed_phrase(0), "حساب تسویه است");
+    }
+
+    #[test]
+    fn the_ask_is_the_last_and_the_biggest_thing_on_the_page() {
+        let small = StatementData {
+            shop: Shop {
+                name: "فروشگاه دایی مراد".to_string(),
+                phone: "۰۲۱-۵۵۴۴۳۳۲۲".to_string(),
+                ..Shop::default()
+            },
+            party_name: "لیلا امینی".to_string(),
+            day: crate::jalali::j2d(1404, 8, 8),
+            balance: 4_405,
+            // One row: the shortest statement there is.
+            rows: vec![StatementRow {
+                day: Some(crate::jalali::j2d(1404, 8, 8)),
+                title: "فاکتور فروش ۱۲".to_string(),
+                amount: 6_405,
+                remaining: Some(4_405),
+                voided: false,
+            }],
+        };
+        let pages = statement_pages(&small);
+        let page = pages.last().expect("a page");
+        let body: Vec<&Text> = page
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                // The footer is stamped afterwards, so it is not the ask.
+                Item::Text(text) if text.class != Class::Note => Some(text),
+                _ => None,
+            })
+            .collect();
+
+        // Nothing the customer reads comes after the ask...
+        let last = body.last().expect("text on the sheet");
+        assert_eq!(last.class, Class::Total, "the ask is the last thing");
+        // ...and the amount is set larger than anything else on the page.
+        let biggest = body.iter().map(|text| text.size).fold(0.0f32, f32::max);
+        assert_eq!(biggest, 16.0, "the balance is the largest type");
+        assert!(
+            body.iter().any(|text| text.size == biggest && text.class == Class::Total),
+            "the largest type is the ask"
+        );
+
+        // A short statement puts the ask at the foot, not right under the row.
+        assert!(
+            last.baseline > 470.0,
+            "the ask sits at the foot of the sheet: {}",
+            last.baseline
+        );
     }
 
     #[test]

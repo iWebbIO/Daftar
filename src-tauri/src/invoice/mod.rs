@@ -261,8 +261,10 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
     // document ahead of a payment on the same day.
     let mut items: Vec<(i64, i64, u8, layout::StatementRow)> = Vec::new();
 
+    // A cancelled invoice is still part of the party's history — he was sent it
+    // once — so it goes on the statement struck through instead of vanishing.
     let sql = format!(
-        "SELECT {} FROM doc d WHERE d.party_id = ?1 AND d.status <> 'void'",
+        "SELECT {} FROM doc d WHERE d.party_id = ?1",
         orders::DOC_COLUMNS
     );
     let mut stmt = conn
@@ -279,6 +281,7 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
         } else {
             format!("فاکتور فروش {}", crate::money::fa_digits(&doc.number.to_string()))
         };
+        let voided = doc.status == "void";
         items.push((
             doc.day,
             doc.id,
@@ -287,7 +290,8 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
                 day: Some(doc.day),
                 title,
                 amount: doc.total,
-                remaining: Some(doc.remaining),
+                remaining: if voided { None } else { Some(doc.remaining) },
+                voided,
             },
         ));
     }
@@ -322,6 +326,7 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
                 title: format!("{verb} {}", method_noun(&method)),
                 amount,
                 remaining: None,
+                voided: false,
             },
         ));
     }
@@ -338,6 +343,7 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
                 title: "مانده قبلی".to_string(),
                 amount: party.opening,
                 remaining: None,
+                voided: false,
             },
         ));
     }
@@ -594,6 +600,7 @@ mod tests {
         let pages = layout::invoice_pages(&data);
         let rows = baselines(&pages, Class::Row);
         assert_eq!(rows.len(), 3, "three lines, three baselines: {rows:?}");
+        layout::page_lint("invoice", &pages);
 
         let rendered = render_doc(&ctx, 1).unwrap();
         assert_eq!(rendered.file_name, "invoice-1404-0012.pdf");
@@ -687,6 +694,7 @@ mod tests {
         assert_eq!(titles.len(), 1);
         assert!(titles[0].glyphs.len() > 8, "«خرید از حاج‌آقا» has letters");
 
+        layout::page_lint("purchase", &pages);
         let rendered = render_doc(&ctx, 7).unwrap();
         assert_eq!(rendered.file_name, "purchase-1404-0007.pdf");
         std::fs::write(dir.join("purchase.pdf"), pdf::render(&pages)).unwrap();
@@ -735,6 +743,7 @@ mod tests {
         };
         // Two extra labelled lines, each with its amount.
         assert_eq!(totals(&pages), totals(&bare_pages) + 4);
+        layout::page_lint("invoice-discount", &pages);
 
         std::fs::write(dir.join("invoice-discount.pdf"), pdf::render(&pages)).unwrap();
         std::fs::write(dir.join("invoice-discount.svg"), svg::render(&pages)).unwrap();
@@ -774,6 +783,64 @@ mod tests {
             .unwrap();
             assert_eq!(frames(&conn), 0, "no card, no box");
         }
+    }
+
+    #[test]
+    fn the_statement_says_who_it_is_from_and_when_it_was_made() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+        }
+        let conn = state.conn().unwrap();
+        let data = load_statement(&conn, 1).unwrap();
+
+        // The date is the day the statement is made, not a value carried in
+        // from anywhere else.
+        assert_eq!(data.day, crate::db::today());
+
+        let pages = layout::statement_pages(&data);
+        layout::page_lint("statement", &pages);
+        let on = |baseline: f32, class: Class| {
+            pages
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .find_map(|item| match item {
+                    Item::Text(text) if text.class == class && (text.baseline - baseline).abs() < 0.1 => {
+                        Some(text.width)
+                    }
+                    _ => None,
+                })
+                .expect("a line at that baseline")
+        };
+
+        // Who it is from: the shop's name, and his phone under it.
+        assert_eq!(data.shop.phone, "۰۲۱-۵۵۴۴۳۳۲۲");
+        let contact = format!(
+            "{} · {}",
+            data.shop.phone.trim(),
+            data.shop.address.trim()
+        );
+        let expected = layout::measure(&contact, 7.8, Weight::Regular);
+        assert!(
+            (on(60.0, Class::Meta) - expected).abs() < 0.01,
+            "the masthead does not carry the shop's phone"
+        );
+
+        // ...and when it was made, said as a date with a label on it.
+        let dated = format!("تاریخ: {}", crate::jalali::long(data.day));
+        let expected = layout::measure(&dated, 9.0, Weight::Regular);
+        assert!(
+            (on(96.0, Class::Meta) - expected).abs() < 0.01,
+            "the statement is not dated the day it was made"
+        );
     }
 
     #[test]
@@ -965,11 +1032,38 @@ mod tests {
         assert_eq!(layout::amount(345, "toman"), "۳۴۵");
         assert_eq!(layout::amount(345, "rial"), "۳٬۴۵۰");
 
-        // The statement's مبلغ, مانده and «مانده حساب» move with it too.
+        // The statement's مبلغ, مانده and «مانده حساب» move with it too, and
+        // so do its words.
         assert_ne!(statement_toman, statement(&conn));
+
+        let data = load_statement(&conn, 1).unwrap();
+        let sheets = layout::statement_pages(&data);
+        layout::page_lint("statement-rial", &sheets);
+        let told = layout::measure(
+            &super::words::currency(data.balance.abs(), "rial"),
+            8.6,
+            Weight::Regular,
+        );
+        let in_words = sheets
+            .iter()
+            .flat_map(|page| page.items.iter())
+            .filter_map(|item| match item {
+                Item::Text(text) if text.class == Class::Total && text.size == 8.6 => {
+                    Some(text.width)
+                }
+                _ => None,
+            })
+            .next()
+            .expect("the amount in words");
+        assert!(
+            (in_words - told).abs() < 0.01,
+            "the statement's words are not in rial: {in_words} vs {told}"
+        );
 
         std::fs::write(dir.join("invoice-rial.pdf"), pdf::render(&pages)).unwrap();
         std::fs::write(dir.join("invoice-rial.svg"), svg::render(&pages)).unwrap();
+        std::fs::write(dir.join("statement-rial.pdf"), pdf::render(&sheets)).unwrap();
+        std::fs::write(dir.join("statement-rial.svg"), svg::render(&sheets)).unwrap();
     }
 
     #[test]
@@ -999,6 +1093,7 @@ mod tests {
         assert_eq!(data.lines.len(), 3);
 
         let pages = layout::invoice_pages(&data);
+        layout::page_lint("invoice-voided", &pages);
         // The cancelled line keeps its row and its place in the numbering.
         assert_eq!(baselines(&pages, Class::Row).len(), 3);
         // A strike is the one thin rule that reaches the right margin; the
