@@ -312,6 +312,14 @@ export interface BotInfo {
   chatTitle: string | null;
 }
 
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  behind: boolean;
+  apkUrl: string | null;
+  notes: string;
+}
+
 export interface BackupInfo {
   at: number;
   size: number;

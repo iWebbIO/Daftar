@@ -144,7 +144,7 @@ export default function Parties() {
           <Empty
             title="هنوز کسی در دفتر نیست"
             hint="اولین فاکتور را که بنویسی، نام مشتری همین‌جا می‌آید."
-            action={<Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور نو</Btn>}
+            action={<Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور جدید</Btn>}
           />
         ) : q.trim() !== "" ? (
           <Empty title="پیدا نشد" hint="نام را کوتاه‌تر بنویس." />

@@ -119,7 +119,7 @@ export default function Products() {
 
       <div className="pr-foot">
         <Btn wide onClick={() => setEditing("new")}>
-          کالای نو
+          کالای جدید
         </Btn>
       </div>
 
@@ -271,7 +271,7 @@ function ProductSheet({
   };
 
   return (
-    <Sheet open onClose={onClose} title={product ? "ویرایش کالا" : "کالای نو"}>
+    <Sheet open onClose={onClose} title={product ? "ویرایش کالا" : "کالای جدید"}>
       <Field
         label="نام کالا"
         value={name}

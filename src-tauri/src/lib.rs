@@ -15,13 +15,14 @@ mod jalali;
 mod money;
 mod share;
 mod telegram;
+mod update;
 
 use db::Res;
 use rusqlite::Connection;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 pub struct Dirs {
     /// daftar.db and its WAL files.
@@ -86,6 +87,9 @@ pub fn route(ctx: &Ctx<'_>, op: &str, args: &Value) -> Res<Value> {
     if let Some(result) = share::handle(ctx, op, args) {
         return result;
     }
+    if let Some(result) = update::handle(ctx, op, args) {
+        return result;
+    }
     if let Some(result) = backup::handle(ctx, op, args) {
         return result;
     }
@@ -112,12 +116,16 @@ pub fn run() {
                 dirs,
             });
 
-            // The daily snapshot: one quiet check at start, on its own thread,
-            // so a slow or missing network never delays the first screen.
+            // The daily snapshot, and a check for a newer version: both on their
+            // own thread, both quiet, so a slow or missing network never delays
+            // the first screen.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let state = handle.state::<AppState>();
                 let ctx = Ctx { state: &state };
+                if let Some(info) = update::check(&ctx) {
+                    let _ = handle.emit("daftar://update", info);
+                }
                 if backup::due(&ctx) {
                     let _ = route(&ctx, "backup.now", &Value::Object(Default::default()));
                 }

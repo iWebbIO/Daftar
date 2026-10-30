@@ -89,7 +89,7 @@ export default function Notes() {
 
       <div className="nt-foot">
         <Btn wide onClick={() => setEditing("new")}>
-          یادداشت تازه
+          یادداشت جدید
         </Btn>
       </div>
 
@@ -158,7 +158,7 @@ function NoteEditor({
       open
       full
       onClose={onClose}
-      title={note ? longDate(note.day) : "یادداشت تازه"}
+      title={note ? longDate(note.day) : "یادداشت جدید"}
     >
       <div className="nt-page">
         <div className="nt-page__day">

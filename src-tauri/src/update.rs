@@ -109,15 +109,15 @@ impl Github for Http {
             .map_err(net_error)?;
 
         if answer.status().as_u16() != 200 {
-            return Err("نسخه تازه دانلود نشد".to_string());
+            return Err("نسخه جدید دانلود نشد".to_string());
         }
 
         let mut file =
-            std::fs::File::create(to).map_err(|_| "فایل نسخه تازه ساخته نشد".to_string())?;
+            std::fs::File::create(to).map_err(|_| "فایل نسخه جدید ساخته نشد".to_string())?;
         // A stream, not a buffer: the APK never sits in memory whole.
         let mut body = answer.into_body().into_reader();
         let copied =
-            std::io::copy(&mut body, &mut file).map_err(|_| "نسخه تازه دانلود نشد".to_string())?;
+            std::io::copy(&mut body, &mut file).map_err(|_| "نسخه جدید دانلود نشد".to_string())?;
         // `file` closes here, before the caller renames it.
         Ok(copied as i64)
     }
@@ -149,7 +149,7 @@ fn refusal(status: u16) -> String {
         // GitHub answers 403 when the hourly limit is used up, and 404 while the
         // repository has no published release.
         403 | 429 => "گیت‌هاب فعلاً پاسخ نمی‌دهد".to_string(),
-        404 => "نسخه تازه‌ای پیدا نشد".to_string(),
+        404 => "نسخه جدید‌ای پیدا نشد".to_string(),
         _ => "بررسی به‌روزرسانی نشد".to_string(),
     }
 }
@@ -244,7 +244,7 @@ pub fn evaluate(current: &str, release: &Value) -> UpdateInfo {
         behind,
         apk_url: pick_apk(release),
         notes: if behind {
-            "نسخه تازه در دسترس است".to_string()
+            "نسخه جدید در دسترس است".to_string()
         } else {
             "برنامه به‌روز است".to_string()
         },
@@ -287,7 +287,7 @@ fn startup_with(ctx: &Ctx<'_>, github: &dyn Github) -> Option<UpdateInfo> {
                 latest,
                 behind: true,
                 apk_url,
-                notes: "نسخه تازه در دسترس است".to_string(),
+                notes: "نسخه جدید در دسترس است".to_string(),
             })
         } else {
             None
@@ -341,12 +341,12 @@ pub fn download_with(ctx: &Ctx<'_>, github: &dyn Github) -> Res<Downloaded> {
     let release = github.release()?;
     let info = evaluate(env!("CARGO_PKG_VERSION"), &release);
     if !info.behind {
-        return Err("نسخه تازه‌ای نیست".to_string());
+        return Err("نسخه جدید‌ای نیست".to_string());
     }
     let url = info
         .apk_url
         .clone()
-        .ok_or_else(|| "فایل نسخه تازه پیدا نشد".to_string())?;
+        .ok_or_else(|| "فایل نسخه جدید پیدا نشد".to_string())?;
 
     // A plain ASCII name: it travels through an intent, a file provider and
     // another app's file list, and none of those need surprises.
@@ -369,10 +369,10 @@ pub fn download_with(ctx: &Ctx<'_>, github: &dyn Github) -> Res<Downloaded> {
 
     if size <= 0 {
         let _ = std::fs::remove_file(&part);
-        return Err("نسخه تازه دانلود نشد".to_string());
+        return Err("نسخه جدید دانلود نشد".to_string());
     }
 
-    std::fs::rename(&part, &whole).map_err(|_| "نسخه تازه دانلود نشد".to_string())?;
+    std::fs::rename(&part, &whole).map_err(|_| "نسخه جدید دانلود نشد".to_string())?;
     let size = std::fs::metadata(&whole)
         .map(|m| m.len() as i64)
         .unwrap_or(size);
@@ -482,7 +482,7 @@ mod tests {
             info.apk_url.as_deref(),
             Some("https://example.test/Daftar-0.1.2.apk")
         );
-        assert!(info.notes.contains("تازه"), "notes: {}", info.notes);
+        assert!(info.notes.contains("جدید"), "notes: {}", info.notes);
     }
 
     #[test]
@@ -607,7 +607,7 @@ mod tests {
         .breaking_after(7);
 
         let why = download_with(&bench.ctx(), &github).unwrap_err();
-        assert_eq!(why, "نسخه تازه دانلود نشد");
+        assert_eq!(why, "نسخه جدید دانلود نشد");
         assert!(
             bench.files().is_empty(),
             "no .apk and no .part may be left: {:?}",
@@ -625,7 +625,7 @@ mod tests {
         .with_bytes(b"old".to_vec());
 
         let why = download_with(&bench.ctx(), &github).unwrap_err();
-        assert_eq!(why, "نسخه تازه‌ای نیست");
+        assert_eq!(why, "نسخه جدید‌ای نیست");
         assert!(bench.files().is_empty());
     }
 
@@ -731,10 +731,10 @@ mod tests {
                 let partial = self.bytes.clone().unwrap_or_default();
                 let kept = partial.len().min(limit);
                 let _ = std::fs::write(to, &partial[..kept]);
-                return Err("نسخه تازه دانلود نشد".to_string());
+                return Err("نسخه جدید دانلود نشد".to_string());
             }
             let bytes = self.bytes.clone().unwrap_or_default();
-            std::fs::write(to, &bytes).map_err(|_| "نسخه تازه دانلود نشد".to_string())?;
+            std::fs::write(to, &bytes).map_err(|_| "نسخه جدید دانلود نشد".to_string())?;
             Ok(bytes.len() as i64)
         }
     }

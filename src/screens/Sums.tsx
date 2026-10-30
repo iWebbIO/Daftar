@@ -123,7 +123,7 @@ function SheetStart() {
 
       <div className="sm-foot">
         <Btn wide onClick={() => setCreating(true)}>
-          برگه تازه
+          برگه جدید
         </Btn>
       </div>
     </Screen>
@@ -258,7 +258,7 @@ function SheetEditor({ id, onBack }: { id?: number; onBack?: () => void }) {
 
           <button className="sm-add" onClick={() => setEditing({ index: null })}>
             <Icon name="plus" size={18} />
-            <span>ردیف تازه</span>
+            <span>ردیف جدید</span>
           </button>
         </Card>
 
@@ -328,7 +328,7 @@ function RowSheet({
   };
 
   return (
-    <Sheet open onClose={onClose} title={existing ? "این ردیف" : "ردیف تازه"}>
+    <Sheet open onClose={onClose} title={existing ? "این ردیف" : "ردیف جدید"}>
       <Field
         label="چه چیزی؟"
         value={label}

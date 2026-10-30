@@ -246,7 +246,7 @@ export default function Invoice(props: { docId: number }) {
             />
             <Row
               leading={<Icon name="book" />}
-              title={purchase ? "خرید تازه برای همین فروشنده" : "فاکتور نو برای همین مشتری"}
+              title={purchase ? "خرید جدید برای همین فروشنده" : "فاکتور جدید برای همین مشتری"}
               sub={party.name}
               onClick={() =>
                 nav.go({ name: "order", kind: doc.kind, partyId: party.id })

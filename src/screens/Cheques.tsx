@@ -152,7 +152,7 @@ export default function Cheques() {
 
       <div className="ch-foot">
         <Btn wide onClick={() => setAdding(true)}>
-          چک تازه
+          چک جدید
         </Btn>
       </div>
 
@@ -329,7 +329,7 @@ function AddCheque({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="چک تازه" full>
+    <Sheet open={open} onClose={onClose} title="چک جدید" full>
       <div className="label">چه چکی؟</div>
       <Segmented
         options={[

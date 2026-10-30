@@ -899,6 +899,18 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
         sent: true,
         message: "نسخه پشتیبان به تلگرام رفت",
       } satisfies BackupInfo;
+    case "update.check":
+      return {
+        current: "0.1.1",
+        latest: "0.1.2",
+        behind: true,
+        apkUrl: "https://example.test/Daftar-0.1.2.apk",
+        notes: "نسخه جدید در دسترس است",
+      };
+
+    case "update.download":
+      throw "در این نسخه نصب نمی‌شود";
+
     case "backup.status":
       return {
         at: s.settings.lastBackupAt ?? 0,

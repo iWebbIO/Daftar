@@ -7,7 +7,7 @@ fn main() {
         tauri_build::Attributes::new().plugin(
             "share",
             tauri_build::InlinedPlugin::new()
-                .commands(&["share", "shareFile"])
+                .commands(&["share", "shareFile", "installApk"])
                 .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands),
         ),
     )

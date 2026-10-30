@@ -455,7 +455,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
           <Field value={pq} onChange={setPq} placeholder="نام مشتری…" />
           <Btn variant="ghost" wide onClick={() => setAdding(true)}>
             <Icon name="plus" size={18} />
-            مشتری تازه
+            مشتری جدید
           </Btn>
           {hits.length > 0 && (
             <Card tight>
@@ -565,13 +565,13 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
                     <Row
                       leading={<Icon name="plus" size={17} />}
                       title={`«${query}» بنویس`}
-                      sub="کالای تازه"
+                      sub="کالای جدید"
                       onClick={() => startLine(null, query)}
                     />
                   )}
                 </Card>
               )}
-              <Field value={itemQ} onChange={setItemQ} placeholder="کالای تازه…" />
+              <Field value={itemQ} onChange={setItemQ} placeholder="کالای جدید…" />
               {query === "" && lines.length > 0 && usual.length > 0 && (
                 <div className="ord-chips">
                   {usual.slice(0, 4).map((p) => (
@@ -759,7 +759,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
       </Sheet>
 
       {/* ---- a new customer, with nothing but a name ---- */}
-      <Sheet open={adding} onClose={() => setAdding(false)} title="مشتری تازه">
+      <Sheet open={adding} onClose={() => setAdding(false)} title="مشتری جدید">
         <Field
           label="نام"
           value={newName}

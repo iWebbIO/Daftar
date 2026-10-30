@@ -193,7 +193,7 @@ export default function App() {
               <div className="tabbar__fab">
                 <button
                   className="tabbar__fabBtn"
-                  aria-label="فاکتور نو"
+                  aria-label="فاکتور جدید"
                   onClick={() => nav.go({ name: "order", kind: "sale" })}
                 >
                   <Icon name="plus" size={26} />

@@ -217,7 +217,7 @@ export default function Party(props: { id: number }) {
           {party.note && <div className="pv__note">{party.note}</div>}
           <div className="pv__acts">
             <Btn onClick={() => nav.go({ name: "order", kind: supplier ? "purchase" : "sale", partyId: id })}>
-              {supplier ? "خرید" : "فاکتور نو"}
+              {supplier ? "خرید" : "فاکتور جدید"}
             </Btn>
             <Btn variant="ghost" onClick={() => nav.go({ name: "payment", partyId: id })}>
               {supplier ? "پول دادم" : "پول گرفتم"}

@@ -75,7 +75,7 @@ export default function Tasks() {
         </Body>
         <div className="tk-foot">
           <Btn wide onClick={() => setAdding(true)}>
-            کار تازه
+            کار جدید
           </Btn>
         </div>
         <AddTask open={adding} onClose={() => setAdding(false)} onSaved={afterSave} />
@@ -169,7 +169,7 @@ export default function Tasks() {
 
       <div className="tk-foot">
         <Btn wide onClick={() => setAdding(true)}>
-          کار تازه
+          کار جدید
         </Btn>
       </div>
 
@@ -287,7 +287,7 @@ function AddTask({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="کار تازه">
+    <Sheet open={open} onClose={onClose} title="کار جدید">
       <Field
         label="چه کاری؟"
         value={text}

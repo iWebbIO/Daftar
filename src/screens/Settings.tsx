@@ -21,7 +21,7 @@ import {
   Segmented,
   Sheet,
 } from "../ui/kit";
-import type { BackupInfo, Settings } from "../types";
+import type { BackupInfo, Settings, UpdateInfo } from "../types";
 
 export default function SettingsScreen() {
   const nav = useNav();
@@ -221,6 +221,8 @@ export default function SettingsScreen() {
             این نسخه فقط برای دیدن ظاهر است و به دفتر اصلی وصل نیست.
           </div>
         )}
+
+        <UpdateCard />
       </Body>
 
       <TokenSheet
@@ -236,8 +238,82 @@ export default function SettingsScreen() {
   );
 }
 
-function TokenSheet({
-  open,
+/**
+ * The app updates itself from its own release page — he should never have to
+ * download a file by hand. Android still shows its own "install?" dialog, which
+ * is the point.
+ */
+function UpdateCard() {
+  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!inApp()) return;
+    let stop: (() => void) | undefined;
+    void (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        stop = await listen<UpdateInfo>("daftar://update", (e) => setInfo(e.payload));
+      } catch {
+        // no event channel (browser preview): the check below is enough
+      }
+      try {
+        setInfo(await api.updateCheck());
+      } catch {
+        // a check never shows an error; silence is the right behaviour
+      }
+    })();
+    return () => stop?.();
+  }, []);
+
+  const install = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const { path } = await api.updateDownload();
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("plugin:share|installApk", { path });
+      setNote("پنجره نصب باز شد.");
+    } catch (e) {
+      setNote(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="label">به‌روزرسانی</div>
+      <Card>
+        <Row
+          leading={<Icon name="today" />}
+          title={info?.behind ? `نسخه ${digitsOf(info.latest)} آماده است` : "نسخه برنامه"}
+          sub={
+            info?.behind
+              ? "برای گرفتنش دکمه پایین را بزن"
+              : `نسخه ${digitsOf(info?.current ?? "۰.۱.۲")}`
+          }
+          value={info?.behind ? <Pill tone="warn">جدید</Pill> : undefined}
+        />
+        <div style={{ padding: "4px 14px 12px" }}>
+          <Btn wide busy={busy} disabled={!inApp() || !info?.behind} onClick={install}>
+            دریافت و نصب
+          </Btn>
+          {note && (
+            <div className="tiny faint" style={{ marginTop: 8 }}>
+              {note}
+            </div>
+          )}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+const digitsOf = (v: string) => v.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]!);
+
+function TokenSheet({  open,
   onClose,
   token,
   onSaved,

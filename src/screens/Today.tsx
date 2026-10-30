@@ -78,7 +78,7 @@ export default function Today() {
         </button>
 
         <div className="quick">
-          <QuickTile icon="book" label="فاکتور نو" onClick={() => nav.go({ name: "order", kind: "sale" })} />
+          <QuickTile icon="book" label="فاکتور جدید" onClick={() => nav.go({ name: "order", kind: "sale" })} />
           <QuickTile icon="check" label="پول گرفتم" onClick={() => nav.go({ name: "payment" })} />
           <QuickTile icon="send" label="خرید" onClick={() => nav.go({ name: "order", kind: "purchase" })} />
         </div>
@@ -178,7 +178,7 @@ export default function Today() {
             title="امروز هنوز چیزی ثبت نشده"
             hint="با دکمه پایین یک فاکتور بساز."
             action={
-              <Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور نو</Btn>
+              <Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور جدید</Btn>
             }
           />
         )}

@@ -34,6 +34,7 @@ import type {
   Task,
   TaskRow,
   TodayView,
+  UpdateInfo,
   Totals,
 } from "./types";
 
@@ -153,5 +154,9 @@ export const api = {
   botCheck: (token: string) => call<BotInfo>("telegram.check", { token }),
   botLink: (token: string) => call<BotInfo>("telegram.link", { token }),
   backupNow: () => call<BackupInfo>("backup.now", {}),
+
+  // ---- updates -----------------------------------------------------------
+  updateCheck: () => call<UpdateInfo>("update.check", {}),
+  updateDownload: () => call<{ path: string; size: number }>("update.download", {}),
   backupStatus: () => call<BackupInfo>("backup.status", {}),
 };
