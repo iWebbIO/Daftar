@@ -127,12 +127,7 @@ export default function Cheques() {
           </Card>
         )}
 
-        {rows.length === 0 && (
-          <Empty
-            title="چکی ثبت نشده"
-            hint="چکهایی که می‌گیری یا می‌دهی را اینجا بنویس تا سررسیدشان یادت نرود."
-          />
-        )}
+        {rows.length === 0 && <Empty title="چکی ثبت نشده" />}
 
         <Group title="سررسید گذشته" rows={groups.overdue} onPick={setPicked} urgent />
         <Group title="این هفته" rows={groups.thisWeek} onPick={setPicked} />
@@ -232,7 +227,7 @@ function ChequeSheet({
   return (
     <Sheet open onClose={onClose} title={partyName}>
       <div className="ch-big">
-        <div className="ch-big__word">{incoming ? "این چک را می‌گیرم" : "این چک را می‌دهم"}</div>
+        <div className="ch-big__word">{incoming ? "می‌گیرم" : "می‌دهم"}</div>
         <div className={`ch-big__num num ${incoming ? "is-pos" : "is-neg"}`}>
           {fmtAmount(cheque.amount)}
         </div>
@@ -250,7 +245,6 @@ function ChequeSheet({
           پاس شد
         </Btn>
       </div>
-      <div className="ch-hint">پاس شد یعنی پولش رسید. برگشت خورد یعنی پول نگرفتی.</div>
     </Sheet>
   );
 }
@@ -398,7 +392,7 @@ function AddCheque({
           </button>
         ))}
       </div>
-      <div className="ch-due">سررسید می‌شود {longDate(due)}</div>
+      <div className="ch-due">سررسید {longDate(due)}</div>
 
       <div className="ch-submit">
         <Btn wide busy={busy} onClick={() => void save()}>

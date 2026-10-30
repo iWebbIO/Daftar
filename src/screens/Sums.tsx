@@ -1,8 +1,8 @@
 // جمع — the numbered columns from his notebook.
 //
-// A row is a name and an amount. The total under the lines keeps up on its own,
-// struck rows stop counting but stay on the page, and the numbers are typed on
-// the pad, never with a minus sign.
+// `#sums` is the pile of pages he already wrote; tap one to open it, or start a
+// new one. A row is a name and an amount, the total under the lines keeps up on
+// its own, and struck rows stop counting but stay on the page.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
@@ -13,14 +13,15 @@ import {
   Body,
   Btn,
   Card,
+  Empty,
   Field,
   Head,
   Icon,
   Loading,
   NumPad,
+  Row,
   Screen,
   Sheet,
-  Empty,
 } from "../ui/kit";
 import type { SumRow, SumSheet } from "../types";
 import "./sums.css";
@@ -44,6 +45,92 @@ let KEY = 1;
 const nextKey = (): number => KEY++;
 
 export default function Sums(props: { id?: number }) {
+  return props.id === undefined ? <SheetStart /> : <SheetEditor id={props.id} />;
+}
+
+/**
+ * Without an id: the sheets he already has. With nothing to list, the blank
+ * page is the whole screen — there is nothing to choose between.
+ */
+function SheetStart() {
+  const nav = useNav();
+  const [sheets, setSheets] = useState<SumSheet[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const list = await api.sums();
+      setSheets([...list].sort((a, b) => b.day - a.day || b.id - a.id));
+      setError(null);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (creating) {
+    return <SheetEditor onBack={() => setCreating(false)} />;
+  }
+
+  if (error && !sheets) {
+    return (
+      <Screen className="sums">
+        <Head title="جمع" onBack={nav.back} />
+        <Body>
+          <Empty title={error} action={<Btn onClick={load}>دوباره</Btn>} />
+        </Body>
+      </Screen>
+    );
+  }
+
+  if (!sheets) {
+    return (
+      <Screen className="sums">
+        <Head title="جمع" onBack={nav.back} />
+        <Body>
+          <Loading />
+        </Body>
+      </Screen>
+    );
+  }
+
+  if (sheets.length === 0) {
+    return <SheetEditor />;
+  }
+
+  return (
+    <Screen className="sums">
+      <Head title="جمع" onBack={nav.back} sub={`${fa(sheets.length)} برگه`} />
+
+      <Body>
+        <Card tight>
+          {sheets.map((sheet) => (
+            <Row
+              key={sheet.id}
+              title={sheet.title?.trim() ? sheet.title : longDate(sheet.day)}
+              sub={`${fa(sheet.rows.length)} ردیف`}
+              value={fmtAmount(sheet.total)}
+              note={sheet.title?.trim() ? longDate(sheet.day) : undefined}
+              onClick={() => nav.go({ name: "sums", id: sheet.id })}
+            />
+          ))}
+        </Card>
+      </Body>
+
+      <div className="sm-foot">
+        <Btn wide onClick={() => setCreating(true)}>
+          برگه تازه
+        </Btn>
+      </div>
+    </Screen>
+  );
+}
+
+function SheetEditor({ id, onBack }: { id?: number; onBack?: () => void }) {
   const nav = useNav();
   const { toast } = useApp();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -53,16 +140,16 @@ export default function Sums(props: { id?: number }) {
 
   const load = useCallback(async () => {
     try {
-      if (props.id) {
-        setDraft(toDraft(await api.sumSheet(props.id)));
-      } else {
+      if (id === undefined) {
         setDraft({ day: today(), title: "", rows: [] });
+      } else {
+        setDraft(toDraft(await api.sumSheet(id)));
       }
       setError(null);
     } catch (e) {
       setError(errorText(e));
     }
-  }, [props.id]);
+  }, [id]);
 
   useEffect(() => {
     void load();
@@ -74,19 +161,15 @@ export default function Sums(props: { id?: number }) {
   );
   const struck = useMemo(() => (draft ? draft.rows.filter((r) => r.struck).length : 0), [draft]);
 
+  const back = onBack ?? nav.back;
+
   const put = (index: number | null, row: { label: string; amount: number; struck: boolean }) => {
     setDraft((old) => {
       if (!old) return old;
       if (index === null) {
-        return {
-          ...old,
-          rows: [...old.rows, { key: nextKey(), id: 0, ...row }],
-        };
+        return { ...old, rows: [...old.rows, { key: nextKey(), id: 0, ...row }] };
       }
-      return {
-        ...old,
-        rows: old.rows.map((r, i) => (i === index ? { ...r, ...row } : r)),
-      };
+      return { ...old, rows: old.rows.map((r, i) => (i === index ? { ...r, ...row } : r)) };
     });
     setEditing(null);
   };
@@ -111,7 +194,12 @@ export default function Sums(props: { id?: number }) {
       });
       setDraft(toDraft(saved));
       toast("جمع ذخیره شد", "ok");
-      if (nav.canGoBack) nav.back();
+      if (draft.id === undefined) {
+        // A new page gets its own address, so it can be found again.
+        nav.replace({ name: "sums", id: saved.id });
+      } else if (nav.canGoBack) {
+        back();
+      }
     } catch (e) {
       toast(errorText(e), "bad");
     } finally {
@@ -122,7 +210,7 @@ export default function Sums(props: { id?: number }) {
   if (error && !draft) {
     return (
       <Screen className="sums">
-        <Head title="جمع" onBack={nav.back} />
+        <Head title="جمع" onBack={back} />
         <Body>
           <Empty title={error} action={<Btn onClick={load}>دوباره</Btn>} />
         </Body>
@@ -133,7 +221,7 @@ export default function Sums(props: { id?: number }) {
   if (!draft) {
     return (
       <Screen className="sums">
-        <Head title="جمع" onBack={nav.back} />
+        <Head title="جمع" onBack={back} />
         <Body>
           <Loading />
         </Body>
@@ -145,11 +233,7 @@ export default function Sums(props: { id?: number }) {
 
   return (
     <Screen className="sums">
-      <Head
-        title="جمع"
-        onBack={nav.back}
-        sub={longDate(draft.day)}
-      />
+      <Head title="جمع" onBack={back} sub={longDate(draft.day)} />
 
       <Body>
         <Field
@@ -158,10 +242,6 @@ export default function Sums(props: { id?: number }) {
           onChange={(title) => setDraft({ ...draft, title })}
           placeholder="مثلاً جمع هفته"
         />
-
-        {draft.rows.length === 0 && (
-          <div className="sm-hint">هر ردیف یک نام دارد و یک مبلغ. جمعش پایین نوشته می‌شود.</div>
-        )}
 
         <Card tight>
           {draft.rows.map((row, i) => (
@@ -189,9 +269,7 @@ export default function Sums(props: { id?: number }) {
               <div className="sm-box__num num">{fmtAmount(total)}</div>
               <div className="sm-box__unit">تومان</div>
             </div>
-            {struck > 0 && (
-              <div className="sm-note">{fa(struck)} ردیف خط خورده، در جمع نیست.</div>
-            )}
+            {struck > 0 && <div className="sm-note">{fa(struck)} ردیف خط خورده</div>}
           </>
         )}
       </Body>
@@ -265,11 +343,7 @@ function RowSheet({
         <div className="sm-amount__unit">تومان</div>
       </div>
 
-      <NumPad
-        onKey={key}
-        onSubmit={() => commit(false)}
-        submitLabel={existing ? "ثبت" : "افزودن"}
-      />
+      <NumPad onKey={key} onSubmit={() => commit(false)} submitLabel={existing ? "ثبت" : "افزودن"} />
 
       {existing && (
         <div className="sm-strike">

@@ -5,6 +5,7 @@
 //! there is exactly one place a total can be wrong and exactly one place tests
 //! have to look.
 
+mod android_share;
 mod backup;
 mod db;
 mod domain;
@@ -94,6 +95,7 @@ pub fn route(ctx: &Ctx<'_>, op: &str, args: &Value) -> Res<Value> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(android_share::init())
         .setup(|app| {
             let base = app
                 .path()

@@ -19,7 +19,8 @@ export type Route =
   | { name: "settings" }
   | { name: "search" }
   | { name: "products" }
-  | { name: "invoice"; docId: number };
+  | { name: "invoice"; docId: number }
+  | { name: "calc" };
 
 export interface Nav {
   route: Route;
@@ -83,6 +84,8 @@ export function hashToRoute(hash: string): Route {
       return { name: "products" };
     case "invoice":
       return { name: "invoice", docId: Number.isFinite(id) ? Number(id) : 1 };
+    case "calc":
+      return { name: "calc" };
     default:
       return { name: "today" };
   }

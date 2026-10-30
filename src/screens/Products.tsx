@@ -95,14 +95,7 @@ export default function Products() {
         />
 
         {list.length === 0 ? (
-          <Empty
-            title={q.trim() === "" ? "کالایی ثبت نشده" : "کالایی با این نام نیست"}
-            hint={
-              q.trim() === ""
-                ? "هر چیزی که می‌فروشی را با واحد و قیمتش بنویس تا دفعه بعد یادت بماند."
-                : "اسم را کوتاه‌تر بنویس."
-            }
-          />
+          <Empty title={q.trim() === "" ? "کالایی ثبت نشده" : "کالایی با این نام نیست"} />
         ) : (
           <>
             <div className="section-head pr-legend">
@@ -302,7 +295,7 @@ function ProductSheet({
       <Field
         value={custom}
         onChange={(v) => setUnit(v === "" ? UNITS[0]! : v)}
-        placeholder="واحد دیگر؟ مثلاً بند"
+        placeholder="واحد دیگر"
       />
 
       <Field

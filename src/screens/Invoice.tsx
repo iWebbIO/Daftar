@@ -282,7 +282,7 @@ export default function Invoice(props: { docId: number }) {
           <Row
             leading={<Icon name="more" />}
             title="اشتراک‌گذاری"
-            sub="به هر برنامه‌ای که روی گوشی است"
+            sub="به هر برنامه دیگری"
             value={which === "share" ? <span className="faint tiny">می‌رود…</span> : undefined}
             onClick={() => void shareIt()}
           />

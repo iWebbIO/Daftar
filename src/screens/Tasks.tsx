@@ -111,10 +111,7 @@ export default function Tasks() {
 
       <Body>
         {nothingLeft ? (
-          <Empty
-            title="هنوز کاری ننوشته‌ای"
-            hint="هر چیزی که باید یادت بماند را بنویس؛ بعد یک ضرب خطش بزن."
-          />
+          <Empty title="هنوز کاری ننوشته‌ای" />
         ) : undone.length > 0 ? (
           <Card tight>
             {undone.map(({ task, partyName }) => (
@@ -136,7 +133,7 @@ export default function Tasks() {
         ) : (
           <div className="tk-clear">
             <Icon name="check" size={18} />
-            <span>کاری نمانده. دستت درد نکنه.</span>
+            <span>کاری نمانده</span>
           </div>
         )}
 

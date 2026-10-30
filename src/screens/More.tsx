@@ -42,6 +42,12 @@ export default function More() {
             onClick={() => nav.go({ name: "sums" })}
           />
           <Row
+            leading={<Icon name="calc" />}
+            title="ماشین‌حساب"
+            sub="جمع و تفریق سریع"
+            onClick={() => nav.go({ name: "calc" })}
+          />
+          <Row
             leading={<Icon name="today" />}
             title="گزارش"
             sub="فروش، طلب، کهنه شدن بدهی"

@@ -35,7 +35,7 @@ import type {
   Totals,
 } from "./types";
 import { g2d, longDate, today } from "./jalali";
-import { lineTotal } from "./format";
+import { fmtAmount, fmtQty, lineTotal } from "./format";
 
 interface Store {
   parties: Party[];
@@ -286,6 +286,10 @@ function db(): Store {
 }
 
 const nextId = () => (db().seq += 1);
+
+/** A plain number as Persian digits, for invoice numbers and the like. */
+const digits = (n: number | string) =>
+  String(n).replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]!);
 
 function balanceOf(partyId: number): number {
   const s = db();
@@ -901,6 +905,81 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
         sent: true,
         message: "آخرین نسخه پشتیبان",
       } satisfies BackupInfo;
+
+    case "share.invoiceText": {
+      const doc = s.docs.find((d) => d.id === Number(a.docId)) ?? s.docs[0]!;
+      const party = s.parties.find((p) => p.id === doc.partyId);
+      const lines = (s.lines[doc.id] ?? []).filter((l) => !l.voided);
+      const out: string[] = [];
+      out.push(`سلام ${party?.name ?? ""} عزیز،`.replace("  ", " "));
+      out.push(
+        `${doc.kind === "purchase" ? "خرید" : "فاکتور"} شماره ${digits(doc.number)} · ${longDate(
+          doc.day,
+        )}`,
+      );
+      if (lines.length) {
+        out.push("");
+        for (const l of lines) {
+          out.push(
+            `• ${l.name} — ${fmtQty(l.qtyMilli)} × ${fmtAmount(l.price)} = ${fmtAmount(l.total)}`,
+          );
+        }
+      }
+      out.push("");
+      out.push(`جمع کل: ${fmtAmount(doc.total)} تومان`);
+      if (doc.paid > 0) out.push(`پرداخت شده: ${fmtAmount(doc.paid)} تومان`);
+      if (doc.remaining > 0) out.push(`مانده: ${fmtAmount(doc.remaining)} تومان`);
+      else if (doc.total > 0) out.push("تسویه شده است.");
+      if (s.settings.cardNumber) {
+        out.push("");
+        if (s.settings.cardHolder) out.push(`به نام ${s.settings.cardHolder}`);
+        if (s.settings.bankName) out.push(s.settings.bankName);
+        out.push(`کارت: ${s.settings.cardNumber}`);
+      }
+      if (s.settings.invoiceNote) {
+        out.push("");
+        out.push(s.settings.invoiceNote);
+      }
+      return { text: out.join("\n"), title: `فاکتور ${digits(doc.number)}` };
+    }
+
+    case "share.statementText": {
+      const party = s.parties.find((p) => p.id === Number(a.partyId)) ?? s.parties[0]!;
+      const bal = balanceOf(party.id);
+      const open = s.docs
+        .filter((d) => d.partyId === party.id && d.status !== "void" && d.remaining > 0)
+        .sort((x, y) => x.day - y.day);
+      const out: string[] = [];
+      out.push(`سلام ${party.name} عزیز،`);
+      out.push("صورت‌حساب شما:");
+      out.push("");
+      if (!open.length) {
+        out.push("حسابی باز نیست.");
+      } else {
+        for (const d of open.slice(0, 12)) {
+          out.push(
+            `• ${d.kind === "purchase" ? "خرید" : "فاکتور"} ${digits(d.number)} · ${longDate(
+              d.day,
+            )} · مانده ${fmtAmount(d.remaining)}`,
+          );
+        }
+        out.push("");
+      }
+      if (bal > 0) {
+        out.push(`مانده حساب: ${fmtAmount(bal)} تومان`);
+        out.push("طلب ما از شماست.");
+      } else if (bal < 0) {
+        out.push(`مانده حساب: ${fmtAmount(-bal)} تومان`);
+        out.push("طلب شما از ماست.");
+      } else {
+        out.push("حساب تسویه است. ممنون.");
+      }
+      if (s.settings.invoiceNote) {
+        out.push("");
+        out.push(s.settings.invoiceNote);
+      }
+      return { text: out.join("\n"), title: "صورت‌حساب" };
+    }
 
     default:
       throw `دستور ناشناخته: ${op}`;

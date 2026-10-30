@@ -1,3 +1,17 @@
+// The phone's own share sheet.
+//
+// The shopkeeper can send an invoice through his Telegram bot (which the app
+// uploads to itself) or through whatever else is on his phone: WhatsApp, the SMS
+// messenger, a printer app. Both sit side by side on the screen and he chooses.
+//
+// Nothing here talks to a server. It hands text, or one file, to an app he picks
+// in Android's own sheet — that sheet is the only place the choice is made.
+//
+// Reached from the interface as:
+//   invoke("plugin:share|share",     { text })
+//   invoke("plugin:share|shareFile", { path, mime, text })
+// The Rust half that registers this class is src-tauri/src/android_share.rs.
+
 package io.moreweb.daftar
 
 import android.app.Activity
@@ -11,17 +25,6 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.Plugin
 import java.io.File
-
-/**
- * The phone's own share sheet.
- *
- * The shopkeeper can send an invoice through his Telegram bot (which the app
- * does itself) or through whatever else is on his phone: WhatsApp, the SMS
- * messenger, a printer app. Both live side by side and he chooses.
- *
- * Nothing here talks to a server. It hands text or one file to an app he picks
- * in Android's own sheet, which is the only place the choice is made.
- */
 
 /** The heading Android prints above the list of apps. */
 private const val CHOOSER_TITLE = "فرستادن با…"
@@ -39,6 +42,9 @@ class ShareArgs {
 
   /** What the file is. A PDF when he does not say otherwise. */
   var mime: String? = null
+
+  /** A subject line, for the apps that show one (mail). Optional. */
+  var subject: String? = null
 }
 
 @TauriPlugin
@@ -68,6 +74,11 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       val intent = Intent(Intent.ACTION_SEND)
       intent.type = "text/plain"
       intent.putExtra(Intent.EXTRA_TEXT, text)
+      args?.subject?.trim()?.let { subject ->
+        if (subject.isNotEmpty()) {
+          intent.putExtra(Intent.EXTRA_SUBJECT, subject)
+        }
+      }
       launch(intent, invoke)
     } catch (ex: Exception) {
       fail(invoke, ex)
@@ -108,6 +119,10 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       val caption = args?.text?.trim().orEmpty()
       if (caption.isNotEmpty()) {
         intent.putExtra(Intent.EXTRA_TEXT, caption)
+      }
+      val subject = args?.subject?.trim().orEmpty()
+      if (subject.isNotEmpty()) {
+        intent.putExtra(Intent.EXTRA_SUBJECT, subject)
       }
 
       launch(intent, invoke)

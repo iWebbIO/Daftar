@@ -112,14 +112,6 @@
 .ch-actions {
   display: grid;
   gap: 10px;
-  margin-bottom: 10px;
-}
-
-.ch-hint {
-  font-size: 11.5px;
-  color: var(--faint);
-  text-align: center;
-  line-height: 1.8;
 }
 
 /* ------------------------------------------------------------------ add form */

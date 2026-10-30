@@ -106,10 +106,10 @@ export default function Search() {
         {error && <Empty title={error} />}
 
         {!error && term.length < 2 && (
-          <Empty
-            title="چه چیزی می‌خواهی پیدا کنی؟"
-            hint="نام کسی، نام کالایی، مبلغ یک فاکتور، یا چیزی که در یادداشت نوشته‌ای. دو حرف کافی است."
-          />
+          <>
+            <Empty title="چه چیزی می‌خواهی پیدا کنی؟" />
+            <div className="sr-kinds">نام · کالا · مبلغ · یادداشت</div>
+          </>
         )}
 
         {!error && term.length >= 2 && busy && hits === null && (
@@ -117,10 +117,7 @@ export default function Search() {
         )}
 
         {!error && term.length >= 2 && hits !== null && hits.length === 0 && !busy && (
-          <Empty
-            title="چیزی پیدا نشد"
-            hint="اسم را کوتاه‌تر بنویس. مبلغ را هم می‌شود بدون جداکننده نوشت."
-          />
+          <Empty title="چیزی پیدا نشد" />
         )}
 
         {!error &&

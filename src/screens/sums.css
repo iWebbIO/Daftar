@@ -128,13 +128,6 @@
   margin: 8px 4px 0;
 }
 
-.sm-hint {
-  font-size: 13.5px;
-  color: var(--muted);
-  line-height: 1.9;
-  margin: 0 4px 12px;
-}
-
 /* ------------------------------------------------------------------- sheet */
 
 .sm-amount {

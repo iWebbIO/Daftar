@@ -12,9 +12,12 @@
 //! the work here is one registration:
 //!
 //! ```text
-//! invoke("plugin:share|share", { text })        → text/plain
-//! invoke("plugin:share|shareFile", { path, mime, text }) → one file
+//! invoke("plugin:share|share", { text, subject })              → text/plain
+//! invoke("plugin:share|shareFile", { path, mime, text, subject }) → one file
 //! ```
+//!
+//! `subject` and `mime` are optional: mail apps show the subject, and the file
+//! is a PDF unless the caller says otherwise.
 //!
 //! Two things outside this file are needed for that invoke to arrive:
 //!

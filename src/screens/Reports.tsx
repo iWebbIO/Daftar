@@ -120,7 +120,7 @@ export default function Reports() {
         <div className="rp-q">کی پول من را نداده؟</div>
         <Card tight>
           {owed === 0 ? (
-            <div className="rp-quiet">همه حساب‌ها صفر است. کسی به تو بدهی ندارد.</div>
+            <div className="rp-quiet">همه حساب‌ها صفر است</div>
           ) : (
             ageing.map((bucket) => (
               <div className={`rp-age ${bucket.amount === 0 ? "is-zero" : ""}`} key={bucket.label}>
@@ -149,7 +149,7 @@ export default function Reports() {
         <div className="rp-q">چه چیزی بیشتر فروش داشته؟</div>
         {top.length === 0 ? (
           <Card>
-            <div className="rp-quiet">در این بازه چیزی فروخته نشده.</div>
+            <div className="rp-quiet">چیزی فروخته نشده</div>
           </Card>
         ) : (
           <Card tight>
@@ -172,9 +172,6 @@ export default function Reports() {
               </div>
             ))}
           </Card>
-        )}
-        {products.length > top.length && (
-          <div className="rp-note">فقط ۱۰ کالای اول را می‌بینی.</div>
         )}
       </Body>
     </Screen>

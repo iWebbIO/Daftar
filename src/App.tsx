@@ -21,6 +21,7 @@ import SettingsScreen from "./screens/Settings";
 import Search from "./screens/Search";
 import Products from "./screens/Products";
 import Invoice from "./screens/Invoice";
+import Calc from "./screens/Calc";
 
 interface Toast {
   id: number;
@@ -133,6 +134,8 @@ export default function App() {
         return <Products />;
       case "invoice":
         return <Invoice docId={route.docId} />;
+      case "calc":
+        return <Calc />;
       default:
         return null;
     }

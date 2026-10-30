@@ -1,0 +1,111 @@
+/* The calculator tape: what was typed stays on the page, like the margin sums. */
+
+.calc__clear {
+  font-size: 13px;
+  color: var(--negative);
+  font-weight: 500;
+  padding: 8px;
+}
+
+.calc__tape {
+  flex: 1;
+  min-height: 0;
+  padding: 8px var(--pad) 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+/* The tape takes the leftover height, so the pad sits at the thumb. */
+.screen:has(.calc__pad) {
+  display: flex;
+  flex-direction: column;
+}
+
+.calc__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 10px;
+  font-size: 16px;
+  color: var(--muted);
+  padding: 2px 0;
+}
+
+.calc__line--pending {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.calc__op {
+  color: var(--faint);
+  font-size: 15px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.calc__result {
+  flex: 0 0 auto;
+  padding: 12px var(--pad) 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+}
+
+.calc__label {
+  font-size: 12.5px;
+  color: var(--muted);
+  min-height: 18px;
+}
+
+.calc__value {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.calc__pad {
+  flex: 0 0 auto;
+  padding: 8px var(--pad) calc(var(--safe-b) + 16px);
+}
+
+.calc__ops {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.calc__opbtn {
+  height: 46px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.calc__opbtn:active {
+  background: var(--brand-soft);
+}
+.calc__opbtn.is-on {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
+}
+
+.calc__eq {
+  height: 46px;
+  border-radius: 12px;
+  background: var(--brand);
+  color: var(--on-brand);
+  display: grid;
+  place-items: center;
+}
+.calc__eq:disabled {
+  opacity: 0.4;
+}

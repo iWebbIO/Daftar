@@ -55,7 +55,10 @@ export default function Party(props: { id: number }) {
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [opening, setOpening] = useState("");
-  const [sending, setSending] = useState(false);
+
+  // sending the statement, two ways
+  const [choosing, setChoosing] = useState(false);
+  const [which, setWhich] = useState<"tg" | "share" | null>(null);
 
   const id = props.id;
 
@@ -131,16 +134,46 @@ export default function Party(props: { id: number }) {
     }
   };
 
+  // A statement goes out two ways: the bot he already has, or the phone's own
+  // share sheet. The words themselves are written on the Rust side.
   const sendStatement = async () => {
-    setSending(true);
+    if (which !== null) return;
+    setWhich("tg");
     try {
       const answer = await api.statementSend(id);
       toast(answer.message, answer.ok ? "ok" : "bad");
+      setChoosing(false);
     } catch (e) {
       toast(errorText(e), "bad");
     } finally {
-      setSending(false);
+      setWhich(null);
     }
+  };
+
+  const shareStatement = async () => {
+    if (which !== null) return;
+    setWhich("share");
+    setChoosing(false);
+    let text: string;
+    try {
+      text = (await api.statementText(id)).text;
+    } catch {
+      toast("متن صورت حساب آماده نشد", "bad");
+      setWhich(null);
+      return;
+    }
+    try {
+      await invoke("plugin:share|share", { text });
+    } catch {
+      // No share sheet here: the words are still worth having on the clipboard.
+      try {
+        await navigator.clipboard.writeText(text);
+        toast("متن صورت حساب کپی شد؛ در پیام‌رسان بچسبان", "ok");
+      } catch {
+        toast("اشتراک‌گذاری روی این گوشی نیست", "bad");
+      }
+    }
+    setWhich(null);
   };
 
   const voidThePayment = async () => {
@@ -236,9 +269,9 @@ export default function Party(props: { id: number }) {
           <Row
             leading={<Icon name="send" />}
             title="فرستادن صورت حساب"
-            sub="به تلگرام"
-            onClick={() => void sendStatement()}
-            value={sending ? <span className="faint tiny">می‌رود…</span> : undefined}
+            sub="به تلگرام یا برنامه دیگر"
+            onClick={() => setChoosing(true)}
+            value={which ? <span className="faint tiny">می‌رود…</span> : undefined}
           />
           <Row
             leading={<Icon name="edit" />}
@@ -302,6 +335,25 @@ export default function Party(props: { id: number }) {
             )}
           </>
         )}
+      </Sheet>
+
+      <Sheet open={choosing} onClose={() => setChoosing(false)} title="فرستادن صورت حساب">
+        <Card tight>
+          <Row
+            leading={<Icon name="send" />}
+            title="فرستادن به تلگرام"
+            sub="به ربات خودت"
+            value={which === "tg" ? <span className="faint tiny">می‌رود…</span> : undefined}
+            onClick={() => void sendStatement()}
+          />
+          <Row
+            leading={<Icon name="more" />}
+            title="اشتراک‌گذاری"
+            sub="به هر برنامه دیگری"
+            value={which === "share" ? <span className="faint tiny">می‌رود…</span> : undefined}
+            onClick={() => void shareStatement()}
+          />
+        </Card>
       </Sheet>
 
       <Sheet open={editing} onClose={() => setEditing(false)} title="ویرایش حساب">

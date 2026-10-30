@@ -81,10 +81,7 @@ export default function Notes() {
 
       <Body>
         {notes.length === 0 ? (
-          <Empty
-            title="هنوز چیزی ننوشته‌ای"
-            hint="قیمتی که بالا رفت، قراری که گذاشتی، هر چیزی که باید یادت بماند."
-          />
+          <Empty title="هنوز چیزی ننوشته‌ای" />
         ) : (
           notes.map((note) => <NoteCard key={note.id} note={note} onOpen={() => setEditing(note)} />)
         )}
@@ -167,14 +164,7 @@ function NoteEditor({
         <div className="nt-page__day">
           {relativeDay(day)} · {weekdayName(day)}
         </div>
-        <Field
-          value={body}
-          onChange={setBody}
-          placeholder="هر چه باید یادت بماند…"
-          multiline
-          rows={14}
-          autoFocus
-        />
+        <Field value={body} onChange={setBody} multiline rows={14} autoFocus />
       </div>
 
       <div className="nt-submit">
