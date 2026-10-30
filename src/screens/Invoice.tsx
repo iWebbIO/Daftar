@@ -238,13 +238,6 @@ export default function Invoice(props: { docId: number }) {
         {!voided && (
           <Card tight>
             <Row
-              leading={<Icon name="send" />}
-              title="فرستادن فاکتور"
-              sub="به تلگرام یا برنامه دیگر"
-              value={which ? <span className="faint tiny">می‌رود…</span> : undefined}
-              onClick={() => setChoosing(true)}
-            />
-            <Row
               leading={<Icon name="book" />}
               title={purchase ? "خرید جدید برای همین فروشنده" : "فاکتور جدید برای همین مشتری"}
               sub={party.name}
@@ -269,6 +262,16 @@ export default function Invoice(props: { docId: number }) {
           </div>
         )}
       </Body>
+
+      {/* The one thing to do with a fresh invoice, always under the thumb: the
+          paper is long and he should never have to scroll to send it. */}
+      {!voided && (
+        <div className="inv-send">
+          <Btn wide size="lg" busy={which !== null} onClick={() => setChoosing(true)}>
+            فرستادن فاکتور
+          </Btn>
+        </div>
+      )}
 
       <Sheet open={choosing} onClose={() => setChoosing(false)} title="فرستادن فاکتور">
         <Card tight>

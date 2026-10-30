@@ -180,3 +180,14 @@
 .inv-voidrow {
   margin-bottom: 10px;
 }
+
+/* The send button rides above the tab bar: a fresh invoice's next step should
+   never be below the fold. */
+.inv-send {
+  flex: 0 0 auto;
+  padding: 8px var(--pad) 10px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  margin-bottom: calc(var(--nav-h) + var(--safe-b));
+}
