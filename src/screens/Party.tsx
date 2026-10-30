@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, errorText } from "../api";
-import { currencyLabel, fmtAmount, fa, latin, parseAmount } from "../format";
+import { currencyLabel, fmtAmount, fa, latin, parseAmount, toInput } from "../format";
 import { dayMonth } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { Payment, PartyBook, TimelineItem } from "../types";
@@ -105,7 +105,7 @@ export default function Party(props: { id: number }) {
     setName(party.name);
     setPhone(party.phone ?? "");
     setNote(party.note ?? "");
-    setOpening(party.opening ? fmtAmount(party.opening) : "");
+    setOpening(party.opening ? toInput(party.opening) : "");
     setEditing(true);
   };
 

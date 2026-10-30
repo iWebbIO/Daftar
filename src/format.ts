@@ -60,6 +60,18 @@ export function fmtToman(n: number): string {
   return `${fmtAmount(n)} ${currencyLabel()}`;
 }
 
+/**
+ * A stored amount as the text an editable field should hold.
+ *
+ * Never seed a price field with `fmtAmount`: that returns the *displayed* number,
+ * and `parseAmount` scales it back down on save, so in rial mode a field he never
+ * touched would divide the amount by ten. This is the one conversion a field
+ * needs, and it is the inverse of `parseAmount`.
+ */
+export function toInput(n: number): string {
+  return String(Math.round(n * currencyScale()));
+}
+
 /** `۵٬۱۷۵` without the unit, for tables where the unit is in the header. */
 export function fmtPlain(n: number): string {
   return fmtAmount(n);

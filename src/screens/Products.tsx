@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "../api";
-import { currencyLabel, fa, fmtAmount, parseAmount, UNITS } from "../format";
+import { currencyLabel, fa, fmtAmount, parseAmount, toInput, UNITS } from "../format";
 import { dayMonth } from "../jalali";
 import { useApp, useNav } from "../nav";
 import {
@@ -95,25 +95,25 @@ export default function Products() {
         />
 
         {list.length === 0 ? (
-          q.trim() !== "" ? <Empty title="کالایی با این نام نیست" /> : null
+          <Empty title={q.trim() !== "" ? "کالایی با این نام نیست" : "کالایی نیست"} />
         ) : (
-          <>
-            <div className="section-head pr-legend">
-              <span>کالا</span>
-              <span>آخرین قیمت فروش</span>
-            </div>
-            <Card tight>
-              {list.map((product) => (
-                <Row
-                  key={product.id}
-                  title={product.name}
-                  sub={`${product.unit} · خرید ${fmtAmount(product.buyPrice)}`}
-                  value={fmtAmount(product.salePrice)}
-                  onClick={() => setHistory(product)}
-                />
-              ))}
-            </Card>
-          </>
+          <Card tight>
+            {list.map((product) => (
+              <Row
+                key={product.id}
+                title={
+                  <>
+                    {product.name}
+                    <span className="pr-u">{product.unit}</span>
+                  </>
+                }
+                sub={`خرید ${fmtAmount(product.buyPrice)}`}
+                value={<span className="pr-sale">{fmtAmount(product.salePrice)}</span>}
+                note="فروش"
+                onClick={() => setHistory(product)}
+              />
+            ))}
+          </Card>
         )}
       </Body>
 
@@ -161,7 +161,7 @@ function HistorySheet({
     void (async () => {
       try {
         const rows = await api.priceHistory(product.id);
-        if (live) setPoints([...rows].sort((a, b) => b.day - a.day));
+        if (live) setPoints(collapse(rows));
       } catch {
         if (live) setPoints([]);
       }
@@ -172,16 +172,16 @@ function HistorySheet({
   }, [product.id]);
 
   const newest = points && points.length > 0 ? points[0] : null;
-  const oldest = points && points.length > 1 ? points[points.length - 1] : null;
+  const previous = points && points.length > 1 ? points[1] : null;
   const change =
-    newest && oldest && oldest.price > 0
-      ? Math.round(((newest.price - oldest.price) / oldest.price) * 100)
+    newest && previous && previous.price > 0
+      ? Math.round(((newest.price - previous.price) / previous.price) * 100)
       : 0;
 
   return (
     <Sheet open onClose={onClose} title={product.name}>
       <div className="pr-now">
-        <div className="pr-now__label">آخرین قیمت فروش</div>
+        <div className="pr-now__label">فروش</div>
         <div className="pr-now__money">
           <Money value={product.salePrice} size="xl" unit />
         </div>
@@ -191,19 +191,20 @@ function HistorySheet({
       {points === null ? (
         <Loading text="قیمت‌ها…" />
       ) : points.length === 0 ? (
-        <div className="pr-quiet">قیمتی برای این کالا ثبت نشده.</div>
+        <div className="pr-quiet">قیمتی نیست</div>
       ) : (
         <>
-          {newest && oldest && (
+          {previous && (
             <div className="pr-change">
               <div className="pr-change__nums">
-                از {fmtAmount(oldest.price)} به {fmtAmount(newest.price)}
+                از {fmtAmount(previous.price)}
+                <span className="pr-change__day">{dayMonth(previous.day)}</span>
               </div>
               <div className="pr-change__word">{changeWord(change)}</div>
             </div>
           )}
           <Card tight>
-            {points.map((point) => (
+            {points.slice(0, 6).map((point) => (
               <div className="pr-point" key={`${point.day}-${point.price}`}>
                 <span className="pr-point__day">{dayMonth(point.day)}</span>
                 <span className="pr-point__price num">{fmtAmount(point.price)}</span>
@@ -234,8 +235,10 @@ function ProductSheet({
   const { toast } = useApp();
   const [name, setName] = useState(product ? product.name : "");
   const [unit, setUnit] = useState(product ? product.unit : UNITS[0]!);
-  const [sale, setSale] = useState(product ? String(product.salePrice) : "");
-  const [buy, setBuy] = useState(product ? String(product.buyPrice) : "");
+  // The fields show the price as he reads it — rial is ten to the toman — so
+  // saving one he never touched cannot move it by a factor of ten.
+  const [sale, setSale] = useState(product ? toInput(product.salePrice) : "");
+  const [buy, setBuy] = useState(product ? toInput(product.buyPrice) : "");
   const [busy, setBusy] = useState(false);
 
   const custom = UNITS.includes(unit) ? "" : unit;
@@ -330,4 +333,19 @@ function ProductSheet({
 function changeWord(pct: number): string {
   if (pct === 0) return "تغییر نکرده";
   return pct > 0 ? `${fa(pct)}٪ بالا رفته` : `${fa(Math.abs(pct))}٪ پایین آمده`;
+}
+
+/**
+ * Newest first, with runs of the same price folded into one row: what he wants
+ * from this page is the days the price *moved*, not eight rows saying ۷۲۰٬۰۰۰.
+ */
+function collapse(rows: PricePoint[]): PricePoint[] {
+  const sorted = [...rows].sort((a, b) => b.day - a.day);
+  const out: PricePoint[] = [];
+  for (const point of sorted) {
+    const last = out[out.length - 1];
+    if (last && last.price === point.price) continue;
+    out.push(point);
+  }
+  return out;
 }

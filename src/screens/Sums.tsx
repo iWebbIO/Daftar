@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { currencyLabel, fa, fmtAmount, latin } from "../format";
+import { currencyLabel, fa, fmtAmount, latin, parseAmount, toInput } from "../format";
 import { longDate, today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import {
@@ -301,8 +301,11 @@ function RowSheet({
   onPut: (row: { label: string; amount: number; struck: boolean }) => void;
 }) {
   const [label, setLabel] = useState(initial ? initial.label : "");
-  const [typed, setTyped] = useState(initial && initial.amount > 0 ? String(initial.amount) : "");
-  const amount = typed === "" ? 0 : Number(typed);
+  const [typed, setTyped] = useState(initial && initial.amount > 0 ? toInput(initial.amount) : "");
+  // The pad collects digits in whichever unit the shop uses, so they come back
+  // through parseAmount. Treating them as toman directly is off by ten the
+  // moment he chooses ریال.
+  const amount = typed === "" ? 0 : (parseAmount(typed) ?? 0);
   const struck = initial ? initial.struck : false;
   const existing = initial !== null;
 
