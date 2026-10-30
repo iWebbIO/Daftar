@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import { fa } from "../format";
-import { longDate, relativeDay, today, weekdayName } from "../jalali";
+import { relativeDay, today, weekdayName } from "../jalali";
 import { useApp, useNav } from "../nav";
 import {
   Body,
@@ -15,7 +15,6 @@ import {
   Empty,
   Field,
   Head,
-  Icon,
   Loading,
   Screen,
   Sheet,
@@ -110,7 +109,6 @@ function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
       <div className="nt-card__date">
         <span>{relativeDay(note.day)}</span>
         <span className="nt-card__weekday">{weekdayName(note.day)}</span>
-        <Icon name="edit" size={14} />
       </div>
       <div className="nt-card__body">{note.body}</div>
     </Card>
@@ -154,16 +152,8 @@ function NoteEditor({
   const changed = body.trim() !== (note ? note.body.trim() : "");
 
   return (
-    <Sheet
-      open
-      full
-      onClose={onClose}
-      title={note ? longDate(note.day) : "یادداشت جدید"}
-    >
+    <Sheet open full onClose={onClose} title={relativeDay(day)}>
       <div className="nt-page">
-        <div className="nt-page__day">
-          {relativeDay(day)} · {weekdayName(day)}
-        </div>
         <Field value={body} onChange={setBody} multiline rows={14} autoFocus />
       </div>
 
