@@ -879,6 +879,100 @@ mod tests {
     }
 
     #[test]
+    fn a_shop_that_writes_in_rial_prints_ten_times_the_figure() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+        }
+
+        // The sheet carries outlines rather than text, so each version is
+        // recognised by the width of its words line — which is the length of
+        // exactly the sentence it should be saying.
+        let render = |conn: &Connection| {
+            let data = load_invoice(&conn, 1).unwrap();
+            let pages = layout::invoice_pages(&data);
+            let words = pages
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .find_map(|item| match item {
+                    Item::Text(text) if (text.shade - 0.28).abs() < 0.001 => Some(text.width),
+                    _ => None,
+                })
+                .expect("the amount in words");
+            (data.total, words, svg::render(&pages), pages)
+        };
+
+        let conn = state.conn().unwrap();
+        let (stored_toman, width_toman, svg_toman, _) = render(&conn);
+        assert_eq!(stored_toman, 6_405);
+        let said_toman = layout::measure(
+            "مبلغ به حروف: شش هزار و چهارصد و پنج تومان",
+            8.6,
+            Weight::Regular,
+        );
+        assert!((width_toman - said_toman).abs() < 0.01);
+
+        // The statement obeys the same setting.
+        let statement = |conn: &Connection| {
+            let data = load_statement(conn, 1).unwrap();
+            svg::render(&layout::statement_pages(&data))
+        };
+        let statement_toman = statement(&conn);
+
+        // The shopkeeper flips the setting; the ledger is not touched. (The
+        // golden shop never wrote a currency row, so this is an upsert, the
+        // same statement the settings screen makes.)
+        conn.execute(
+            "INSERT INTO setting(key, value) VALUES('currency', 'rial')
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [],
+        )
+        .unwrap();
+        assert_eq!(settings::load(&conn).currency, "rial");
+
+        let (stored_rial, width_rial, svg_rial, pages) = render(&conn);
+        assert_eq!(stored_rial, 6_405, "the database still holds toman");
+        let in_db: i64 = conn
+            .query_row("SELECT total FROM doc WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(in_db, 6_405, "writing rial must not rewrite the ledger");
+
+        // Ten times the figure, and the other unit word.
+        assert_eq!(
+            words::currency(6_405, "rial"),
+            "شصت و چهار هزار و پنجاه ریال"
+        );
+        let said_rial = layout::measure(
+            "مبلغ به حروف: شصت و چهار هزار و پنجاه ریال",
+            8.6,
+            Weight::Regular,
+        );
+        assert!(
+            (width_rial - said_rial).abs() < 0.01,
+            "the words line measures {width_rial}, expected {said_rial}"
+        );
+        assert_ne!(svg_toman, svg_rial);
+
+        // Every cell moves with the unit, including the table.
+        assert_eq!(layout::amount(345, "toman"), "۳۴۵");
+        assert_eq!(layout::amount(345, "rial"), "۳٬۴۵۰");
+
+        // The statement's مبلغ, مانده and «مانده حساب» move with it too.
+        assert_ne!(statement_toman, statement(&conn));
+
+        std::fs::write(dir.join("invoice-rial.pdf"), pdf::render(&pages)).unwrap();
+        std::fs::write(dir.join("invoice-rial.svg"), svg::render(&pages)).unwrap();
+    }
+
+    #[test]
     fn a_cancelled_line_is_struck_through_not_hidden() {
         let dir = out_dir();
         let state = crate::AppState {

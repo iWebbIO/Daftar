@@ -133,12 +133,6 @@ pub fn words(n: i64) -> String {
 }
 
 /// The line that goes under the total: `۱٬۸۶۲٬۰۰۰` → «یک میلیون و هشتصد و
-/// شصت و دو هزار تومان».
-pub fn toman(n: i64) -> String {
-    format!("{} تومان", words(n))
-}
-
-/// The line that goes under the total: `۱٬۸۶۲٬۰۰۰` → «یک میلیون و هشتصد و
 /// شصت و دو هزار تومان». The ledger is in toman; a shop that prints in rial
 /// gets the same amount at ten times the figure, with the other unit word.
 pub fn currency(toman: i64, currency: &str) -> String {
@@ -200,7 +194,10 @@ mod tests {
     #[test]
     fn a_debt_is_said_as_a_negative() {
         assert_eq!(words(-2_500), "منفی دو هزار و پانصد");
-        assert_eq!(toman(1_862_000), "یک میلیون و هشتصد و شصت و دو هزار تومان");
+        assert_eq!(
+            currency(1_862_000, "toman"),
+            "یک میلیون و هشتصد و شصت و دو هزار تومان"
+        );
     }
 
     #[test]
