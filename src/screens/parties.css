@@ -70,3 +70,21 @@
 .pword--neg {
   color: var(--negative);
 }
+
+/* Very narrow phones, and rial, which costs every figure one more digit: the two
+   totals share the width above the list, so the type gives way rather than the
+   number being cut. */
+@media (max-width: 380px) {
+  .ptot .ptot__num {
+    font-size: 15px;
+    letter-spacing: -0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .ptot__word {
+    font-size: 11px;
+  }
+  .ptot__cell {
+    padding-inline: 8px;
+  }
+}
