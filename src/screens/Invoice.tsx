@@ -35,6 +35,7 @@ export default function Invoice(props: { docId: number }) {
   const [which, setWhich] = useState<"tg" | "share" | null>(null);
   /** The message on screen, when neither the sheet nor the clipboard works. */
   const [manually, setManually] = useState<string | null>(null);
+  const [big, setBig] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -176,14 +177,18 @@ export default function Invoice(props: { docId: number }) {
           </div>
         )}
 
-        {/* the page itself, when the app can draw it */}
+        {/* the page itself, when the app can draw it. Tapping it opens the paper
+            full width: an A5 sheet shrunk to a phone makes 9pt type about 7px,
+            and an invoice he cannot read is a picture, not a document. */}
         {svg !== "" && (
-          <img
-            className="inv-svg"
-            alt={title}
-            src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
-            onError={() => setSvg("")}
-          />
+          <button className="inv-svgbtn" onClick={() => setBig(true)} aria-label={title}>
+            <img
+              className="inv-svg"
+              alt={title}
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
+              onError={() => setSvg("")}
+            />
+          </button>
         )}
 
         {/* the same paper, in rows */}
@@ -295,6 +300,12 @@ export default function Invoice(props: { docId: number }) {
           />
         </Card>
       </Sheet>
+
+      {svg !== "" && big && (
+        <div className="inv-zoom" onClick={() => setBig(false)}>
+          <img src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} alt={title} />
+        </div>
+      )}
 
       <Sheet open={manually !== null} onClose={() => setManually(null)} title="متن فاکتور">
         <Field

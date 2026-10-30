@@ -191,3 +191,43 @@
   border-top: 1px solid var(--line);
   margin-bottom: calc(var(--nav-h) + var(--safe-b));
 }
+/* The paper as a picture is a thumbnail; tapping it gives the full width so the
+   type is readable and Android's own pinch-zoom can take it further. */
+.inv-svgbtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  background: #fff;
+}
+.inv-svgbtn:active {
+  transform: scale(0.995);
+}
+
+.inv-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.inv-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(10, 12, 9, 0.86);
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.inv-zoom img {
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  background: #fff;
+  border-radius: 6px;
+}
