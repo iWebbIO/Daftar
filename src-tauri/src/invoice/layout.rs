@@ -244,11 +244,11 @@ pub(super) struct PlacedLine {
 /// «جمع کل ۵٬۱۷۵ تومان» read as four words and a number instead of a jumble.
 /// The glyphs come back in visual order, so a writer only ever has to move
 /// leftwards to right.
-pub(super) fn typeset_line(text: &str, size: f32, weight: Weight) -> PlacedLine {
+pub(super) fn typeset_line(text: &str, size: f32, weight: Weight, tabular: bool) -> PlacedLine {
     let runs = super::bidi::runs(text, Dir::PARAGRAPH);
     let parts: Vec<font::Typeset> = runs
         .iter()
-        .map(|run| font::typeset(run.text, size, weight, run.dir))
+        .map(|run| font::typeset(run.text, size, weight, run.dir, tabular))
         .collect();
     let width: f32 = parts.iter().map(|part| part.width).sum();
 
@@ -280,9 +280,18 @@ pub(super) fn typeset_line(text: &str, size: f32, weight: Weight) -> PlacedLine 
 }
 
 /// Starts a line of Persian at no particular place; the builder methods below
-/// put it where the sheet wants it.
+/// put it where the sheet wants it. Prose is set in proportional figures.
 pub(super) fn line(text: &str, size: f32, weight: Weight) -> Text {
-    let placed = typeset_line(text, size, weight);
+    shaped(text, size, weight, false)
+}
+
+/// A line of money: equal-width figures, so a column of amounts lines up.
+pub(super) fn money(text: &str, size: f32, weight: Weight) -> Text {
+    shaped(text, size, weight, true)
+}
+
+fn shaped(text: &str, size: f32, weight: Weight, tabular: bool) -> Text {
+    let placed = typeset_line(text, size, weight, tabular);
     Text {
         x: 0.0,
         baseline: 0.0,
@@ -360,13 +369,33 @@ pub fn num_fine(v: f32) -> String {
 
 /// The width a string will take, in points.
 pub fn measure(text: &str, size: f32, weight: Weight) -> f32 {
-    typeset_line(text, size, weight).width
+    typeset_line(text, size, weight, false).width
+}
+
+/// The width a column of money will take, in tabular figures.
+pub fn measure_money(text: &str, size: f32, weight: Weight) -> f32 {
+    typeset_line(text, size, weight, true).width
 }
 
 /// Trims a string to fit a column, with an ellipsis. Descriptions and notes are
 /// typed by hand and can be longer than the space they get; a line that runs
 /// into the next column is worse than a line that ends in «…».
 pub fn fit(text: &str, size: f32, weight: Weight, max: f32) -> String {
+    trim(text, size, weight, max, measure)
+}
+
+/// The same for a cell of money, measured in the figures it will be drawn in.
+pub fn fit_money(text: &str, size: f32, weight: Weight, max: f32) -> String {
+    trim(text, size, weight, max, measure_money)
+}
+
+fn trim(
+    text: &str,
+    size: f32,
+    weight: Weight,
+    max: f32,
+    measure: fn(&str, f32, Weight) -> f32,
+) -> String {
     if measure(text, size, weight) <= max {
         return text.to_string();
     }
@@ -731,7 +760,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         };
         let pen = if item.voided { 0.46 } else { INK_FAINT };
         sheet.page.push(
-            line(&fa_digits(&index.to_string()), 8.5, Weight::Regular)
+            money(&fa_digits(&index.to_string()), 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(pen)
                 .at(y)
@@ -751,7 +780,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         // how a Persian invoice reads.
         let qty = fmt_qty(item.qty_milli);
         sheet.page.push(
-            line(&qty, 8.5, Weight::Regular)
+            money(&qty, 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
@@ -766,9 +795,9 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
                 .right(grid.unit),
         );
 
-        let price = fit(&fmt_amount(item.price), 8.5, Weight::Regular, 52.0);
+        let price = fit_money(&fmt_amount(item.price), 8.5, Weight::Regular, 52.0);
         sheet.page.push(
-            line(&price, 8.5, Weight::Regular)
+            money(&price, 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
@@ -779,7 +808,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
             let discount = item.discount();
             if discount > 0 {
                 sheet.page.push(
-                    line(&fmt_amount(discount), 8.5, Weight::Regular)
+                    money(&fmt_amount(discount), 8.5, Weight::Regular)
                         .class(Class::Row)
                         .shade(ink)
                         .at(y)
@@ -795,9 +824,9 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         } else {
             fmt_amount(item.total)
         };
-        let total = fit(&total, 8.5, Weight::Regular, 62.0);
+        let total = fit_money(&total, 8.5, Weight::Regular, 62.0);
         sheet.page.push(
-            line(&total, 8.5, Weight::Regular)
+            money(&total, 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
@@ -843,7 +872,7 @@ fn tot_line(
     );
     if !amount.is_empty() {
         page.push(
-            line(amount, size, weight)
+            money(amount, size, weight)
                 .class(Class::Total)
                 .shade(shade)
                 .at(y)
@@ -1178,7 +1207,7 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
         );
         let amount = fmt_amount(item.amount);
         sheet.page.push(
-            line(&amount, 8.8, Weight::Regular)
+            money(&amount, 8.8, Weight::Regular)
                 .class(Class::Row)
                 .shade(INK)
                 .at(y)
@@ -1187,7 +1216,7 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
         if let Some(rest) = item.remaining {
             let rest = fmt_amount(rest);
             sheet.page.push(
-                line(&rest, 8.8, Weight::Regular)
+                money(&rest, 8.8, Weight::Regular)
                     .class(Class::Row)
                     .shade(INK_SOFT)
                     .at(y)
@@ -1370,5 +1399,69 @@ mod tests {
         assert_ne!(draw(5_175), draw(-5_175));
         assert_ne!(draw(5_175), draw(0));
         assert!(draw(0).contains("</svg>"));
+    }
+
+    #[test]
+    fn a_card_number_is_printed_in_groups_of_four_latin_digits() {
+        assert_eq!(
+            card_groups("6063731024264062"),
+            "6063 - 7310 - 2426 - 4062"
+        );
+        // Already grouped, or grouped with the shopkeeper's own spacing.
+        assert_eq!(
+            card_groups("6063-7310-2426-4062"),
+            "6063 - 7310 - 2426 - 4062"
+        );
+        // Anything that is not sixteen digits is left exactly as it was typed.
+        assert_eq!(card_groups("6063 7310"), "6063 7310");
+    }
+
+    #[test]
+    fn a_discount_only_names_a_percentage_when_it_is_a_whole_one() {
+        assert_eq!(percent_of(2_000, 100_000), Some(2));
+        assert_eq!(percent_of(175, 6_405), None);
+        assert_eq!(percent_of(0, 6_405), None);
+        assert_eq!(percent_of(6_405, 6_405), Some(100));
+        assert_eq!(percent_of(7_000, 6_405), None);
+    }
+
+    #[test]
+    fn the_grid_always_spans_the_paper() {
+        for with_discount in [false, true] {
+            let grid = Grid::new(with_discount);
+            // Columns run right to left and never overlap.
+            assert!(grid.pos > grid.title, "{grid:?}");
+            assert!(grid.title > grid.qty, "{grid:?}");
+            assert!(grid.qty > grid.unit, "{grid:?}");
+            assert!(grid.unit > grid.price, "{grid:?}");
+            assert!(grid.price > grid.total, "{grid:?}");
+            if let Some(discount) = grid.discount {
+                assert!(grid.price > discount && discount > grid.total, "{grid:?}");
+            }
+            // ...and the description is always given real room.
+            assert!(grid.title_width >= 70.0, "{grid:?}");
+        }
+    }
+
+    #[test]
+    fn the_card_box_is_a_frame_of_four_hairlines() {
+        let frame = Frame {
+            x0: CARD_LEFT,
+            y0: 400.0,
+            x1: RIGHT,
+            y1: 470.0,
+            width: 0.4,
+            shade: 0.78,
+        };
+        let bars = frame_bars(&frame);
+        assert_eq!(bars.len(), 4);
+        // Top and bottom are horizontal, the sides are vertical, and all four
+        // are as thin as the frame asked for.
+        assert!(bars[0].3 - bars[0].1 < 0.5);
+        assert!(bars[2].2 - bars[2].0 < 0.5);
+        for (x0, y0, x1, y1) in bars {
+            assert!(x1 >= x0 && y1 >= y0);
+            assert!(x0 >= frame.x0 - 0.01 && x1 <= frame.x1 + 0.01);
+        }
     }
 }

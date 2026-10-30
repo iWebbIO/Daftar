@@ -215,7 +215,7 @@ mod tests {
     use super::*;
 
     fn gids(text: &str, weight: Weight, dir: Dir) -> Vec<u16> {
-        typeset(text, 10.0, weight, dir)
+        typeset(text, 10.0, weight, dir, false)
             .glyphs
             .iter()
             .map(|g| g.gid)
@@ -240,7 +240,7 @@ mod tests {
             "rustybuzz now returns RTL glyphs in {clusters:?}; the layout in font.rs must follow"
         );
         // ...and what this module hands to the layout is sorted left to right.
-        let placed = typeset("سلام", 10.0, Weight::Regular, Dir::Rtl);
+        let placed = typeset("سلام", 10.0, Weight::Regular, Dir::Rtl, false);
         for pair in placed.glyphs.windows(2) {
             assert!(pair[0].dx <= pair[1].dx, "{:?}", placed.glyphs);
         }
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn a_left_to_right_run_is_laid_out_left_to_right() {
-        let placed = typeset("1404/08/08", 10.0, Weight::Regular, Dir::Ltr);
+        let placed = typeset("1404/08/08", 10.0, Weight::Regular, Dir::Ltr, false);
         for pair in placed.glyphs.windows(2) {
             assert!(pair[0].dx < pair[1].dx);
         }
@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn tabular_digits_all_move_the_pen_by_the_same_amount() {
-        let placed = typeset("۱۲۳۴۵۶۷۸۹۰", 10.0, Weight::Regular, Dir::Ltr);
+        let placed = typeset("۱۲۳۴۵۶۷۸۹۰", 10.0, Weight::Regular, Dir::Ltr, true);
         assert_eq!(placed.glyphs.len(), 10);
         let first = placed.glyphs[0].adv;
         for glyph in &placed.glyphs {

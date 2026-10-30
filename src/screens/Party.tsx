@@ -2,6 +2,7 @@
 // history the way a notebook page reads — newest line at the top.
 
 import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { api, errorText } from "../api";
 import { fmtAmount, fa, latin, parseAmount } from "../format";
 import { dayMonth } from "../jalali";

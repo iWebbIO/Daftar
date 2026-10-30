@@ -318,7 +318,7 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
             1,
             layout::StatementRow {
                 day: Some(day),
-                title: format!("{verb} {}", method_fa(&method)),
+                title: format!("{verb} {}", method_noun(&method)),
                 amount,
                 remaining: None,
             },
@@ -352,10 +352,22 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
     })
 }
 
+/// How a payment method is named on the invoice: `نوع پرداخت: نقدی`.
 fn method_fa(method: &str) -> &'static str {
     match method {
+        "cash" => "نقدی",
+        "card" => "کارت به کارت",
+        "cheque" => "چک",
+        _ => "دیگر",
+    }
+}
+
+/// The same method as the object of a verb, for a statement line: «دریافت نقد»
+/// rather than «دریافت نقدی».
+fn method_noun(method: &str) -> &'static str {
+    match method {
         "cash" => "نقد",
-        "card" => "کارت",
+        "card" => "کارت به کارت",
         "cheque" => "چک",
         _ => "دیگر",
     }
@@ -386,7 +398,10 @@ mod tests {
                  ('shop_name', 'فروشگاه دایی مراد'),
                  ('shop_phone', '۰۲۱-۵۵۴۴۳۳۲۲'),
                  ('shop_address', 'تهران، بازار آهنگرها، پلاک ۱۲'),
-                 ('invoice_note', 'جنس فروخته‌شده تا ۳ روز قابل تعویض است.');",
+                 ('invoice_note', 'جنس فروخته‌شده تا ۳ روز قابل تعویض است.'),
+                 ('bank_name', 'بانک قرض‌الحسنه مهر ایران'),
+                 ('card_holder', 'سعید سمند'),
+                 ('card_number', '6063 - 7310 - 2426 - 4062');",
         )
         .unwrap();
     }
@@ -437,7 +452,7 @@ mod tests {
         // «سلام» is four letters and, once shaped, fewer glyphs: the lam-alef
         // ligature swallows two of them. Each glyph is also a real glyph id for
         // its contextual form, not the code point it came from.
-        let shaped = font::typeset("سلام", 10.0, Weight::Regular, bidi::Dir::Rtl);
+        let shaped = font::typeset("سلام", 10.0, Weight::Regular, bidi::Dir::Rtl, false);
         assert!(
             shaped.glyphs.len() < "سلام".chars().count(),
             "{} glyphs for four letters",
@@ -452,7 +467,7 @@ mod tests {
 
     #[test]
     fn the_number_sits_between_the_words_around_it() {
-        let placed = layout::typeset_line("جمع کل ۵٬۱۷۵ تومان", 10.0, Weight::Regular);
+        let placed = layout::typeset_line("جمع کل ۵٬۱۷۵ تومان", 10.0, Weight::Regular, true);
         assert_eq!(placed.runs.len(), 3, "{:?}", placed.runs);
 
         let left_word = placed.runs[0]; // «جمع کل » — read first, so rightmost
@@ -481,8 +496,8 @@ mod tests {
     #[test]
     fn amounts_are_drawn_with_persian_digits() {
         let amount = crate::money::fmt_amount(5_175);
-        let persian = font::typeset(&amount, 10.0, Weight::Regular, bidi::Dir::Ltr);
-        let latin = font::typeset("5175", 10.0, Weight::Regular, bidi::Dir::Ltr);
+        let persian = font::typeset(&amount, 10.0, Weight::Regular, bidi::Dir::Ltr, true);
+        let latin = font::typeset("5175", 10.0, Weight::Regular, bidi::Dir::Ltr, true);
 
         let persian: Vec<u16> = persian.glyphs.iter().map(|g| g.gid).collect();
         let latin: Vec<u16> = latin.glyphs.iter().map(|g| g.gid).collect();
@@ -493,8 +508,8 @@ mod tests {
         // two runs look identical on paper — but they are different glyphs, and
         // the invoice never hands the shaper a Latin digit in the first place.
         for pair in ["0", "5", "9"] {
-            let a = font::typeset(&crate::money::fa_digits(pair), 10.0, Weight::Regular, bidi::Dir::Ltr);
-            let b = font::typeset(pair, 10.0, Weight::Regular, bidi::Dir::Ltr);
+            let a = font::typeset(&crate::money::fa_digits(pair), 10.0, Weight::Regular, bidi::Dir::Ltr, true);
+            let b = font::typeset(pair, 10.0, Weight::Regular, bidi::Dir::Ltr, true);
             assert_ne!(a.glyphs[0].gid, b.glyphs[0].gid);
             assert_eq!(
                 font::outline(Weight::Regular, a.glyphs[0].gid).len(),
@@ -690,9 +705,12 @@ mod tests {
         {
             let conn = state.conn().unwrap();
             golden_invoice(&conn);
-            // 6,405 less a 175 discount, then rounded up by 25 to 6,255.
-            conn.execute_batch("UPDATE doc SET discount = 175, rounding = 25 WHERE id = 1")
-                .unwrap();
+            // 6,405 of goods less a 175 discount, then rounded up by 25 to
+            // 6,255 — the three figures an Iranian فاکتور shows before مبلغ کل.
+            conn.execute_batch(
+                "UPDATE doc SET discount = 175, rounding = 25, total = 6255 WHERE id = 1",
+            )
+            .unwrap();
         }
 
         let plain = {
@@ -719,6 +737,144 @@ mod tests {
 
         std::fs::write(dir.join("invoice-discount.pdf"), pdf::render(&pages)).unwrap();
         std::fs::write(dir.join("invoice-discount.svg"), svg::render(&pages)).unwrap();
+    }
+
+    #[test]
+    fn the_card_box_appears_only_when_the_shop_filled_it_in() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+        }
+        let frames = |conn: &Connection| {
+            let data = load_invoice(conn, 1).unwrap();
+            layout::invoice_pages(&data)
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .filter(|item| matches!(item, Item::Frame(_)))
+                .count()
+        };
+
+        {
+            let conn = state.conn().unwrap();
+            assert_eq!(frames(&conn), 1, "the golden shop has a card");
+
+            conn.execute_batch(
+                "UPDATE setting SET value = '' WHERE key IN
+                     ('bank_name', 'card_holder', 'card_number');",
+            )
+            .unwrap();
+            assert_eq!(frames(&conn), 0, "no card, no box");
+        }
+    }
+
+    #[test]
+    fn the_invoice_says_whether_it_is_settled_and_how_it_was_paid() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+        }
+        let draw = |conn: &Connection| {
+            let data = load_invoice(conn, 1).unwrap();
+            svg::render(&layout::invoice_pages(&data))
+        };
+
+        let conn = state.conn().unwrap();
+        // The golden invoice has 4,405 outstanding and a cash payment against
+        // it, so «وضعیت فاکتور» and «نوع پرداخت» both have something to say.
+        let unpaid = draw(&conn);
+        let meta = layout::invoice_pages(&load_invoice(&conn, 1).unwrap())
+            .iter()
+            .flat_map(|page| page.items.iter())
+            .filter(|item| matches!(item, Item::Text(text) if text.class == Class::Meta))
+            .count();
+        assert_eq!(meta, 5, "four facts and the shop's own contact line");
+
+        // Paying the rest changes the status line, and paying by card changes
+        // the method line: either one makes a different drawing.
+        conn.execute_batch(
+            "UPDATE payment SET amount = 6405, method = 'card' WHERE id = 1;
+             UPDATE allocation SET amount = 6405 WHERE payment_id = 1;",
+        )
+        .unwrap();
+        let settled = draw(&conn);
+        assert_ne!(unpaid, settled);
+
+        conn.execute_batch("UPDATE payment SET method = 'cheque' WHERE id = 1;")
+            .unwrap();
+        assert_ne!(settled, draw(&conn), "the method word on the sheet");
+    }
+
+    #[test]
+    fn the_headers_are_the_words_an_iranian_invoice_uses() {
+        // The page carries outlines, not text, so each heading is checked by
+        // the width it was typeset at: that width is what «قیمت واحد» measures
+        // and nothing else does.
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+        }
+
+        let heads = |conn: &Connection| {
+            let data = load_invoice(conn, 1).unwrap();
+            layout::invoice_pages(&data)
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .filter_map(|item| match item {
+                    Item::Text(text) if text.class == Class::Head => Some(text.width),
+                    _ => None,
+                })
+                .collect::<Vec<f32>>()
+        };
+
+        let conn = state.conn().unwrap();
+        let six = heads(&conn);
+        for (width, label) in six.iter().zip([
+            "ردیف",
+            "عنوان",
+            "مقدار",
+            "واحد",
+            "قیمت واحد",
+            "قیمت کل",
+        ]) {
+            assert!(
+                (width - layout::measure(label, 8.0, Weight::Medium)).abs() < 0.01,
+                "a heading is not {label}"
+            );
+        }
+
+        // A line sold for less than its own price grows the «تخفیف» column.
+        conn.execute("UPDATE doc_line SET total = 5000 WHERE id = 1", [])
+            .unwrap();
+        let seven = heads(&conn);
+        assert_eq!(seven.len(), 7);
+        assert!(
+            (seven[5] - layout::measure("تخفیف", 8.0, Weight::Medium)).abs() < 0.01,
+            "the discount column is missing its heading"
+        );
     }
 
     #[test]
@@ -837,9 +993,9 @@ mod tests {
         assert!(amount.contains('\u{066C}'), "fmt_amount gave {amount}");
         assert!(!amount.contains(','), "fmt_amount gave {amount}");
 
-        let shaped = font::typeset(&amount, 9.0, Weight::Regular, bidi::Dir::Ltr);
-        let separator = font::typeset("\u{066C}", 9.0, Weight::Regular, bidi::Dir::Ltr);
-        let comma = font::typeset(",", 9.0, Weight::Regular, bidi::Dir::Ltr);
+        let shaped = font::typeset(&amount, 9.0, Weight::Regular, bidi::Dir::Ltr, true);
+        let separator = font::typeset("\u{066C}", 9.0, Weight::Regular, bidi::Dir::Ltr, true);
+        let comma = font::typeset(",", 9.0, Weight::Regular, bidi::Dir::Ltr, true);
         assert_eq!(shaped.glyphs[1].gid, separator.glyphs[0].gid);
         assert_ne!(
             shaped.glyphs[1].gid, comma.glyphs[0].gid,

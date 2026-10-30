@@ -20,3 +20,4 @@ Thumbs.db
 src-tauri/gen/schemas/
 src-tauri/gen/android/keystore.properties
 src-tauri/gen/android/app/tauri.properties
+.shots/

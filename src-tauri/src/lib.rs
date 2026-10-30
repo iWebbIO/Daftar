@@ -12,6 +12,7 @@ mod dto;
 mod invoice;
 mod jalali;
 mod money;
+mod share;
 mod telegram;
 
 use db::Res;
@@ -79,6 +80,9 @@ pub fn route(ctx: &Ctx<'_>, op: &str, args: &Value) -> Res<Value> {
         return result;
     }
     if let Some(result) = telegram::handle(ctx, op, args) {
+        return result;
+    }
+    if let Some(result) = share::handle(ctx, op, args) {
         return result;
     }
     if let Some(result) = backup::handle(ctx, op, args) {

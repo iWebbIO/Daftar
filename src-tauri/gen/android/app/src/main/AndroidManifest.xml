@@ -33,5 +33,24 @@
             android:name="android.support.FILE_PROVIDER_PATHS"
             android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+          The share sheet. An invoice or a backup leaves the app as a
+          content:// URI under this authority, which exists so another app can
+          read exactly the one file the shopkeeper picked and nothing else.
+          `${applicationId}.files` is `io.moreweb.daftar.files` for this app;
+          SharePlugin.kt builds the same string from the app's own package name,
+          so a change of application id cannot leave the two out of step.
+          Kept apart from the provider above, whose authority the framework owns.
+        -->
+        <provider
+          android:name="androidx.core.content.FileProvider"
+          android:authorities="${applicationId}.files"
+          android:exported="false"
+          android:grantUriPermissions="true">
+          <meta-data
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

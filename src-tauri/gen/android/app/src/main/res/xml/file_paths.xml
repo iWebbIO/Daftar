@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Which files may leave the app as a content:// URI, for the FileProviders in
+  AndroidManifest.xml. Keep this list as short as it can be: every entry is a
+  door, and the share sheet only ever needs the app's own files folder.
+-->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- The app's private files folder. Invoice and statement PDFs are written to
+       <dataDir>/files, which is exactly this root, and nothing else lives here. -->
+  <files-path name="app_files" path="." />
   <external-path name="my_images" path="." />
   <cache-path name="my_cache_images" path="." />
 </paths>

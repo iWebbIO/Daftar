@@ -3,6 +3,7 @@
 // still has to be able to read his own paper.
 
 import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { api, errorText } from "../api";
 import { fa, fmtAmount, fmtQty, lineTotal } from "../format";
 import { longDate } from "../jalali";
@@ -30,7 +31,8 @@ export default function Invoice(props: { docId: number }) {
   const [full, setFull] = useState<DocFull | null>(null);
   const [svg, setSvg] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const [which, setWhich] = useState<"tg" | "share" | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,16 +62,46 @@ export default function Invoice(props: { docId: number }) {
     [lines],
   );
 
-  const send = async () => {
-    setSending(true);
+  // The paper goes out two ways, and which one is his call: through the bot he
+  // already has, or through whatever the phone itself offers.
+  const sendTelegram = async () => {
+    if (which !== null) return;
+    setWhich("tg");
     try {
       const answer = await api.invoiceSend(id);
       toast(answer.message, answer.ok ? "ok" : "bad");
+      setChoosing(false);
     } catch (e) {
       toast(errorText(e), "bad");
     } finally {
-      setSending(false);
+      setWhich(null);
     }
+  };
+
+  const shareIt = async () => {
+    if (which !== null) return;
+    setWhich("share");
+    setChoosing(false);
+    let text: string;
+    try {
+      text = (await api.invoiceText(id)).text;
+    } catch {
+      toast("متن فاکتور آماده نشد", "bad");
+      setWhich(null);
+      return;
+    }
+    try {
+      await invoke("plugin:share|share", { text });
+    } catch {
+      // No share sheet here: the words are still worth having on the clipboard.
+      try {
+        await navigator.clipboard.writeText(text);
+        toast("متن فاکتور کپی شد؛ در پیام‌رسان بچسبان", "ok");
+      } catch {
+        toast("اشتراک‌گذاری روی این گوشی نیست", "bad");
+      }
+    }
+    setWhich(null);
   };
 
   const doVoid = async () => {
@@ -207,10 +239,10 @@ export default function Invoice(props: { docId: number }) {
           <Card tight>
             <Row
               leading={<Icon name="send" />}
-              title="فرستادن به تلگرام"
-              sub="همین صفحه برای مشتری می‌رود"
-              value={sending ? <span className="faint tiny">می‌رود…</span> : undefined}
-              onClick={() => void send()}
+              title="فرستادن فاکتور"
+              sub="به تلگرام یا برنامه دیگر"
+              value={which ? <span className="faint tiny">می‌رود…</span> : undefined}
+              onClick={() => setChoosing(true)}
             />
             <Row
               leading={<Icon name="book" />}
@@ -237,6 +269,25 @@ export default function Invoice(props: { docId: number }) {
           </div>
         )}
       </Body>
+
+      <Sheet open={choosing} onClose={() => setChoosing(false)} title="فرستادن فاکتور">
+        <Card tight>
+          <Row
+            leading={<Icon name="send" />}
+            title="فرستادن به تلگرام"
+            sub="به ربات خودت"
+            value={which === "tg" ? <span className="faint tiny">می‌رود…</span> : undefined}
+            onClick={() => void sendTelegram()}
+          />
+          <Row
+            leading={<Icon name="more" />}
+            title="اشتراک‌گذاری"
+            sub="به هر برنامه‌ای که روی گوشی است"
+            value={which === "share" ? <span className="faint tiny">می‌رود…</span> : undefined}
+            onClick={() => void shareIt()}
+          />
+        </Card>
+      </Sheet>
 
       <Sheet open={voiding} onClose={() => setVoiding(false)} title="خط زدن فاکتور">
         <p className="howto-p">

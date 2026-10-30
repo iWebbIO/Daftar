@@ -142,6 +142,13 @@ export const api = {
     call<{ ok: boolean; message: string }>("invoice.sendStatement", { partyId }),
   invoicePreview: (docId: number) => call<{ path: string }>("invoice.preview", { docId }),
 
+  // ---- sharing -----------------------------------------------------------
+  /** The message he would type himself, addressed to the customer by name. */
+  invoiceText: (docId: number) =>
+    call<{ text: string; title: string }>("share.invoiceText", { docId }),
+  statementText: (partyId: number) =>
+    call<{ text: string; title: string }>("share.statementText", { partyId }),
+
   // ---- telegram and backup ----------------------------------------------
   botCheck: (token: string) => call<BotInfo>("telegram.check", { token }),
   botLink: (token: string) => call<BotInfo>("telegram.link", { token }),
