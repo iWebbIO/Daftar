@@ -17,7 +17,7 @@ fn rows_of(conn: &Connection, sheet_id: i64) -> Res<Vec<SumRow>> {
             "SELECT id, sheet_id, pos, label, amount, party_id, struck
              FROM sum_row WHERE sheet_id = ?1 ORDER BY pos, id",
         )
-        .map_err(|e| format!("خواندن سطرهای برگه نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     let rows = stmt
         .query_map([sheet_id], |r| {
             Ok(SumRow {
@@ -30,9 +30,9 @@ fn rows_of(conn: &Connection, sheet_id: i64) -> Res<Vec<SumRow>> {
                 struck: r.get(6)?,
             })
         })
-        .map_err(|e| format!("خواندن سطرهای برگه نشد: {e}"))?
+        .map_err(|_| "دفتر خوانده نشد".to_string())?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن سطرهای برگه نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     Ok(rows)
 }
 
@@ -47,8 +47,8 @@ pub fn get(conn: &Connection, id: i64) -> Res<SumSheet> {
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .optional()
-        .map_err(|e| format!("خواندن برگه نشد: {e}"))?
-        .ok_or_else(|| "این برگه پیدا نشد".to_string())?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?
+        .ok_or_else(|| "برگه پیدا نشد".to_string())?;
     let rows = rows_of(conn, id)?;
     let total = rows.iter().filter(|r| !r.struck).map(|r| r.amount).sum();
     Ok(SumSheet {
@@ -66,12 +66,12 @@ pub fn list(conn: &Connection) -> Res<Vec<SumSheet>> {
     let ids: Vec<i64> = {
         let mut stmt = conn
             .prepare("SELECT id FROM sum_sheet ORDER BY day DESC, id DESC")
-            .map_err(|e| format!("خواندن برگه‌ها نشد: {e}"))?;
+            .map_err(|_| "دفتر خوانده نشد".to_string())?;
         let found = stmt
             .query_map([], |r| r.get(0))
-            .map_err(|e| format!("خواندن برگه‌ها نشد: {e}"))?
+            .map_err(|_| "دفتر خوانده نشد".to_string())?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("خواندن برگه‌ها نشد: {e}"))?;
+            .map_err(|_| "دفتر خوانده نشد".to_string())?;
         found
     };
     ids.into_iter().map(|id| get(conn, id)).collect()
@@ -107,7 +107,7 @@ pub fn save(conn: &Connection, input: &SumSheetInput) -> Res<SumSheet> {
 
     let tx = conn
         .unchecked_transaction()
-        .map_err(|e| format!("ذخیره برگه نشد: {e}"))?;
+        .map_err(|_| "ذخیره نشد".to_string())?;
 
     let (id, action) = match &old {
         Some(sheet) => {
@@ -115,7 +115,7 @@ pub fn save(conn: &Connection, input: &SumSheetInput) -> Res<SumSheet> {
                 "UPDATE sum_sheet SET day = ?1, title = ?2 WHERE id = ?3",
                 params![day, title, sheet.id],
             )
-            .map_err(|e| format!("ذخیره برگه نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             (sheet.id, "update")
         }
         None => {
@@ -123,13 +123,13 @@ pub fn save(conn: &Connection, input: &SumSheetInput) -> Res<SumSheet> {
                 "INSERT INTO sum_sheet(day, title, created_at) VALUES(?1, ?2, ?3)",
                 params![day, title, db::now_ms()],
             )
-            .map_err(|e| format!("ذخیره برگه نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             (tx.last_insert_rowid(), "create")
         }
     };
 
     tx.execute("DELETE FROM sum_row WHERE sheet_id = ?1", [id])
-        .map_err(|e| format!("ذخیره برگه نشد: {e}"))?;
+        .map_err(|_| "ذخیره نشد".to_string())?;
 
     let mut total = 0i64;
     for (pos, row) in input.rows.iter().enumerate() {
@@ -146,7 +146,7 @@ pub fn save(conn: &Connection, input: &SumSheetInput) -> Res<SumSheet> {
                 row.struck
             ],
         )
-        .map_err(|e| format!("ذخیره برگه نشد: {e}"))?;
+        .map_err(|_| "ذخیره نشد".to_string())?;
         if !row.struck {
             total += row.amount;
         }
@@ -159,7 +159,7 @@ pub fn save(conn: &Connection, input: &SumSheetInput) -> Res<SumSheet> {
         action,
         &json!({ "total": total, "rows": input.rows.len(), "day": day }).to_string(),
     )?;
-    tx.commit().map_err(|e| format!("ذخیره برگه نشد: {e}"))?;
+    tx.commit().map_err(|_| "ذخیره نشد".to_string())?;
 
     get(conn, id)
 }
@@ -178,26 +178,22 @@ struct IdArgs {
 
 pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
-        "sums.list" => {
-            (|| {
-                let conn = ctx.conn()?;
-                Ok(serde_json::to_value(list(&conn)?)
-                    .map_err(|e| format!("خواندن برگه‌ها نشد: {e}"))?)
-            })()
-        }
+        "sums.list" => (|| {
+            let conn = ctx.conn()?;
+            Ok(serde_json::to_value(list(&conn)?).map_err(|_| "مشکلی پیش آمد".to_string())?)
+        })(),
         "sums.get" => (|| {
             let a: IdArgs =
-                serde_json::from_value(args.clone()).map_err(|_| "برگه پیدا نشد".to_string())?;
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
-            Ok(serde_json::to_value(get(&conn, a.id)?)
-                .map_err(|e| format!("خواندن برگه نشد: {e}"))?)
+            Ok(serde_json::to_value(get(&conn, a.id)?).map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "sums.save" => (|| {
-            let a: SaveArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "اطلاعات برگه خوانده نشد".to_string())?;
+            let a: SaveArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(save(&conn, &a.sheet)?)
-                .map_err(|e| format!("ذخیره برگه نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         _ => return None,
     })

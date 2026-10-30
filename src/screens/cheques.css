@@ -63,8 +63,10 @@
   color: var(--warn);
 }
 
+/* Finished cheques are quieter, but still readable: that is how he checks what
+   he pressed. */
 .ch-closed {
-  opacity: 0.55;
+  opacity: 0.7;
   margin-top: 6px;
 }
 

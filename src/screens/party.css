@@ -26,11 +26,47 @@
   color: var(--muted);
 }
 
-.pv__acts {
+/* ------------------------------------------------------- the next actions */
+
+/* Under the thumb, above the tab bar: what he does with this person next. */
+.pacts {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(var(--nav-h) + var(--safe-b));
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-top: 14px;
+  padding: 10px var(--pad);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+  z-index: 15;
+}
+
+/* The page must be able to scroll clear of it. */
+.party-page .body {
+  padding-bottom: calc(var(--nav-h) + var(--safe-b) + 96px);
+}
+
+/* With the keyboard up the bar steps out of the way of the field. */
+body.kb-open .pacts {
+  display: none;
+}
+
+/* ------------------------------------------------------- the two outcomes */
+
+/* A paper is either still owed or finished, and it says which in a word. */
+.pv-rest {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.pv-paid {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--positive);
 }
 
 /* --------------------------------------------------------------- telephone */

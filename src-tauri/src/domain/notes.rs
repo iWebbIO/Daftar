@@ -33,8 +33,8 @@ pub fn get(conn: &Connection, id: i64) -> Res<Note> {
         from_row,
     )
     .optional()
-    .map_err(|e| format!("خواندن یادداشت نشد: {e}"))?
-    .ok_or_else(|| "این یادداشت پیدا نشد".to_string())
+    .map_err(|_| "دفتر خوانده نشد".to_string())?
+    .ok_or_else(|| "یادداشت پیدا نشد".to_string())
 }
 
 /// `%`, `_` and `\` mean themselves when they are part of what was typed.
@@ -65,12 +65,12 @@ pub fn list(conn: &Connection, q: Option<&str>, limit: Option<i64>) -> Res<Vec<N
              WHERE (?1 IS NULL OR title LIKE ?1 ESCAPE '\\' OR body LIKE ?1 ESCAPE '\\')
              ORDER BY day DESC, id DESC LIMIT ?2"
         ))
-        .map_err(|e| format!("خواندن یادداشت‌ها نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     let rows = stmt
         .query_map(params![pattern, limit], from_row)
-        .map_err(|e| format!("خواندن یادداشت‌ها نشد: {e}"))?
+        .map_err(|_| "دفتر خوانده نشد".to_string())?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن یادداشت‌ها نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     Ok(rows)
 }
 
@@ -111,7 +111,7 @@ pub fn save(conn: &Connection, input: &NoteInput) -> Res<Note> {
                 "UPDATE note SET day = ?1, title = ?2, body = ?3, updated_at = ?4 WHERE id = ?5",
                 params![day, title, body, now, note.id],
             )
-            .map_err(|e| format!("ذخیره یادداشت نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             note.id
         }
         None => {
@@ -120,7 +120,7 @@ pub fn save(conn: &Connection, input: &NoteInput) -> Res<Note> {
                  VALUES(?1, ?2, ?3, ?4, ?4)",
                 params![day, title, body, now],
             )
-            .map_err(|e| format!("ذخیره یادداشت نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             conn.last_insert_rowid()
         }
     };
@@ -133,9 +133,9 @@ pub fn save(conn: &Connection, input: &NoteInput) -> Res<Note> {
 pub fn remove(conn: &Connection, id: i64) -> Res<bool> {
     let gone = conn
         .execute("DELETE FROM note WHERE id = ?1", [id])
-        .map_err(|e| format!("پاک کردن یادداشت نشد: {e}"))?;
+        .map_err(|_| "پاک نشد".to_string())?;
     if gone == 0 {
-        return Err("این یادداشت پیدا نشد".to_string());
+        return Err("یادداشت پیدا نشد".to_string());
     }
     Ok(true)
 }
@@ -162,22 +162,22 @@ struct IdArgs {
 pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
         "notes.list" => (|| {
-            let a: ListArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "فهرست یادداشت‌ها خوانده نشد".to_string())?;
+            let a: ListArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(list(&conn, a.q.as_deref(), a.limit)?)
-                .map_err(|e| format!("خواندن یادداشت‌ها نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "notes.save" => (|| {
-            let a: SaveArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "اطلاعات یادداشت خوانده نشد".to_string())?;
+            let a: SaveArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(save(&conn, &a.note)?)
-                .map_err(|e| format!("ذخیره یادداشت نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "notes.remove" => (|| {
             let a: IdArgs =
-                serde_json::from_value(args.clone()).map_err(|_| "یادداشت پیدا نشد".to_string())?;
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(Value::Bool(remove(&conn, a.id)?))
         })(),

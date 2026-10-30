@@ -115,7 +115,8 @@ export default function Party(props: { id: number }) {
     setReason("");
   };
 
-  const saveEdit = async () => {    setBusy(true);
+  const saveEdit = async () => {
+    setBusy(true);
     try {
       await api.saveParty({
         ...party,
@@ -197,7 +198,7 @@ export default function Party(props: { id: number }) {
     item.kind === "payment" ? book.payments.find((p) => p.id === item.id) : undefined;
 
   return (
-    <Screen>
+    <Screen className="party-page">
       <Head
         title={party.name}
         sub={KIND_WORD[party.kind] ?? "مشتری"}
@@ -215,14 +216,6 @@ export default function Party(props: { id: number }) {
         <Card className="pv">
           <Balance value={book.balance} />
           {party.note && <div className="pv__note">{party.note}</div>}
-          <div className="pv__acts">
-            <Btn onClick={() => nav.go({ name: "order", kind: supplier ? "purchase" : "sale", partyId: id })}>
-              {supplier ? "خرید" : "فاکتور جدید"}
-            </Btn>
-            <Btn variant="ghost" onClick={() => nav.go({ name: "payment", partyId: id })}>
-              {supplier ? "پول دادم" : "پول گرفتم"}
-            </Btn>
-          </div>
         </Card>
 
         {book.items.length > 0 ? (
@@ -239,17 +232,19 @@ export default function Party(props: { id: number }) {
                 return (
                   <Row
                     key={`${item.kind}-${item.id}`}
-                    title={item.title}
+                    title={fa(item.title)}
                     sub={dayMonth(item.day)}
                     value={fmtAmount(item.amount)}
                     tone={isPay ? (incoming ? "pos" : "neg") : "plain"}
                     struck={!isPay && item.status === "settled"}
                     note={
-                      isPay
-                        ? METHOD_WORD[payment?.method ?? "cash"] ?? "نقد"
-                        : item.remaining > 0
-                          ? `مانده ${fmtAmount(item.remaining)}`
-                          : undefined
+                      isPay ? (
+                        METHOD_WORD[payment?.method ?? "cash"] ?? "نقد"
+                      ) : item.remaining > 0 ? (
+                        <span className="pv-rest">مانده {fmtAmount(item.remaining)}</span>
+                      ) : (
+                        <span className="pv-paid">تسویه شد</span>
+                      )
                     }
                     onClick={() =>
                       isPay
@@ -276,11 +271,23 @@ export default function Party(props: { id: number }) {
           <Row
             leading={<Icon name="edit" />}
             title="ویرایش حساب"
-            sub="نام، تلفن، یادداشت، حساب قبلی"
             onClick={openEdit}
           />
         </Card>
       </Body>
+
+      {/* The next thing he does with this person lives under his thumb. */}
+      <div className="pacts">
+        <Btn
+          size="lg"
+          onClick={() => nav.go({ name: "order", kind: supplier ? "purchase" : "sale", partyId: id })}
+        >
+          {supplier ? "خرید" : "فاکتور جدید"}
+        </Btn>
+        <Btn size="lg" variant="ghost" onClick={() => nav.go({ name: "payment", partyId: id })}>
+          {supplier ? "پول دادم" : "پول گرفتم"}
+        </Btn>
+      </div>
 
       <Sheet
         open={pay !== null}

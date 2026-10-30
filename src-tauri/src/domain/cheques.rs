@@ -48,8 +48,8 @@ pub fn get(conn: &Connection, id: i64) -> Res<ChequeRow> {
         from_row,
     )
     .optional()
-    .map_err(|e| format!("خواندن چک نشد: {e}"))?
-    .ok_or_else(|| "این چک پیدا نشد".to_string())
+    .map_err(|_| "دفتر خوانده نشد".to_string())?
+    .ok_or_else(|| "چک پیدا نشد".to_string())
 }
 
 /// Pending cheques first, soonest due at the top; everything settled after it,
@@ -65,12 +65,12 @@ pub fn list(conn: &Connection, status: Option<&str>) -> Res<Vec<ChequeRow>> {
                       CASE WHEN c.status = 'pending' THEN c.due_day END ASC,
                       c.due_day DESC, c.id DESC"
         ))
-        .map_err(|e| format!("خواندن چک‌ها نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     let rows = stmt
         .query_map([wanted], from_row)
-        .map_err(|e| format!("خواندن چک‌ها نشد: {e}"))?
+        .map_err(|_| "دفتر خوانده نشد".to_string())?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن چک‌ها نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     Ok(rows)
 }
 
@@ -97,7 +97,7 @@ fn live_payment(conn: &Connection, payment_id: Option<i64>) -> Res<Option<i64>> 
         |r| r.get::<_, i64>(0),
     )
     .optional()
-    .map_err(|e| format!("خواندن پرداخت چک نشد: {e}"))
+    .map_err(|_| "دفتر خوانده نشد".to_string())
 }
 
 /// A corrected cheque must not leave its payment telling a different story. When
@@ -114,7 +114,7 @@ fn sync_payment(
 ) -> Res<()> {
     let current = payments::load(conn, payment_id)?;
     if current.party_id != party_id {
-        return Err("چکی که باز شده را نمی‌شود به طرف‌حساب دیگری برد".to_string());
+        return Err("اول چک را از پاس دربیار، بعد طرف حسابش را عوض کن".to_string());
     }
     let reference = reference
         .map(str::trim)
@@ -153,16 +153,16 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
 
     let party_id = input.party_id;
     if party_id <= 0 {
-        return Err("طرف حساب چک را انتخاب کنید".to_string());
+        return Err("طرف حساب را بزن".to_string());
     }
     let known: Option<i64> = conn
         .query_row("SELECT id FROM party WHERE id = ?1", [party_id], |r| {
             r.get(0)
         })
         .optional()
-        .map_err(|e| format!("خواندن طرف حساب نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     if known.is_none() {
-        return Err("این طرف حساب پیدا نشد".to_string());
+        return Err("طرف حساب پیدا نشد".to_string());
     }
 
     let direction = match input
@@ -177,16 +177,16 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
             .unwrap_or_else(|| "in".to_string()),
         Some("in") => "in".to_string(),
         Some("out") => "out".to_string(),
-        Some(_) => return Err("جهت چک درست نیست".to_string()),
+        Some(_) => return Err("چک را دریافتی یا دادنی بزن".to_string()),
     };
 
     let amount = input.amount;
     if amount <= 0 {
-        return Err("مبلغ چک باید بیشتر از صفر باشد".to_string());
+        return Err("مبلغ را بنویس".to_string());
     }
     let due_day = input.due_day;
     if due_day <= 0 {
-        return Err("تاریخ سررسید چک را بنویسید".to_string());
+        return Err("تاریخ سررسید را بنویس".to_string());
     }
 
     let number = text(
@@ -204,7 +204,7 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
 
     let tx = conn
         .unchecked_transaction()
-        .map_err(|e| format!("ذخیره چک نشد: {e}"))?;
+        .map_err(|_| "ذخیره نشد".to_string())?;
 
     let id = match &old {
         Some(current) => {
@@ -223,7 +223,7 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
                         amount = ?5, due_day = ?6, note = ?7 WHERE id = ?8",
                 params![party_id, direction, number, bank, amount, due_day, note, current.id],
             )
-            .map_err(|e| format!("ذخیره چک نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             db::audit(
                 &tx,
                 "cheque",
@@ -249,7 +249,7 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
                     db::now_ms()
                 ],
             )
-            .map_err(|e| format!("ذخیره چک نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             let id = tx.last_insert_rowid();
             db::audit(
                 &tx,
@@ -262,7 +262,7 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
         }
     };
 
-    tx.commit().map_err(|e| format!("ذخیره چک نشد: {e}"))?;
+    tx.commit().map_err(|_| "ذخیره نشد".to_string())?;
     Ok(get(conn, id)?.cheque)
 }
 
@@ -279,7 +279,7 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
 pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) -> Res<Cheque> {
     let status = status.trim();
     if !STATUSES.contains(&status) {
-        return Err("وضعیت چک درست نیست".to_string());
+        return Err("مشکلی پیش آمد".to_string());
     }
     let before = get(conn, id)?.cheque;
     let live = live_payment(conn, before.payment_id)?;
@@ -292,7 +292,7 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
     let day = day.filter(|d| *d > 0).unwrap_or_else(db::today);
     let tx = conn
         .unchecked_transaction()
-        .map_err(|e| format!("تغییر وضعیت چک نشد: {e}"))?;
+        .map_err(|_| "وضعیت چک عوض نشد".to_string())?;
 
     match status {
         "cleared" => {
@@ -323,7 +323,7 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
                 "UPDATE cheque SET status = 'cleared', payment_id = ?1 WHERE id = ?2",
                 params![payment_id, id],
             )
-            .map_err(|e| format!("تغییر وضعیت چک نشد: {e}"))?;
+            .map_err(|_| "وضعیت چک عوض نشد".to_string())?;
             db::audit(
                 &tx,
                 "cheque",
@@ -335,8 +335,8 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
         other => {
             let reason = match other {
                 "bounced" => "چک برگشت خورد",
-                "returned" => "چک برگشت داده شد",
-                _ => "چک دوباره در انتظار شد",
+                "returned" => "چک پس داده شد",
+                _ => "چک به انتظار برگشت",
             };
             if let Some(payment_id) = live {
                 // The money is gone from the balance, so the invoices it had
@@ -344,19 +344,19 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
                 let touched: Vec<i64> = {
                     let mut stmt = tx
                         .prepare("SELECT DISTINCT doc_id FROM allocation WHERE payment_id = ?1")
-                        .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?;
+                        .map_err(|_| "وضعیت چک عوض نشد".to_string())?;
                     let found = stmt
                         .query_map([payment_id], |r| r.get(0))
-                        .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?
+                        .map_err(|_| "وضعیت چک عوض نشد".to_string())?
                         .collect::<Result<Vec<_>, _>>()
-                        .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?;
+                        .map_err(|_| "وضعیت چک عوض نشد".to_string())?;
                     found
                 };
                 tx.execute(
                     "UPDATE payment SET voided = 1, void_reason = ?1 WHERE id = ?2 AND voided = 0",
                     params![reason, payment_id],
                 )
-                .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?;
+                .map_err(|_| "وضعیت چک عوض نشد".to_string())?;
                 for doc_id in touched {
                     orders::refresh_status(&tx, doc_id)?;
                 }
@@ -379,7 +379,7 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
                 "UPDATE cheque SET status = ?1, payment_id = ?2 WHERE id = ?3",
                 params![other, keep, id],
             )
-            .map_err(|e| format!("تغییر وضعیت چک نشد: {e}"))?;
+            .map_err(|_| "وضعیت چک عوض نشد".to_string())?;
             db::audit(
                 &tx,
                 "cheque",
@@ -390,8 +390,7 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
         }
     }
 
-    tx.commit()
-        .map_err(|e| format!("تغییر وضعیت چک نشد: {e}"))?;
+    tx.commit().map_err(|_| "وضعیت چک عوض نشد".to_string())?;
     Ok(get(conn, id)?.cheque)
 }
 
@@ -418,26 +417,26 @@ struct StatusArgs {
 pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
         "cheques.list" => (|| {
-            let a: ListArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "فهرست چک‌ها خوانده نشد".to_string())?;
+            let a: ListArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(list(&conn, a.status.as_deref())?)
-                .map_err(|e| format!("خواندن چک‌ها نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "cheques.save" => (|| {
-            let a: SaveArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "اطلاعات چک خوانده نشد".to_string())?;
+            let a: SaveArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(save(&conn, &a.cheque)?)
-                .map_err(|e| format!("ذخیره چک نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "cheques.status" => (|| {
-            let a: StatusArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "وضعیت چک خوانده نشد".to_string())?;
+            let a: StatusArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(
                 serde_json::to_value(set_status(&conn, a.id, &a.status, a.day)?)
-                    .map_err(|e| format!("تغییر وضعیت چک نشد: {e}"))?,
+                    .map_err(|_| "مشکلی پیش آمد".to_string())?,
             )
         })(),
         _ => return None,

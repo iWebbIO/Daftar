@@ -218,6 +218,19 @@ function seed(): Store {
         createdAt: now(),
       },
       {
+        id: 3,
+        partyId: 6,
+        direction: "in",
+        number: "۹۰۸۷۷",
+        bank: "ملی",
+        amount: 3_500_000,
+        dueDay: day - 4, // passed and still pending: the one he must not miss
+        status: "pending",
+        note: null,
+        paymentId: null,
+        createdAt: now(),
+      },
+      {
         id: 2,
         partyId: 4,
         direction: "out",

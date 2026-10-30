@@ -36,8 +36,8 @@ fn one(conn: &Connection, id: i64) -> Res<TaskRow> {
         from_row,
     )
     .optional()
-    .map_err(|e| format!("خواندن کار نشد: {e}"))?
-    .ok_or_else(|| "این کار پیدا نشد".to_string())
+    .map_err(|_| "دفتر خوانده نشد".to_string())?
+    .ok_or_else(|| "کار پیدا نشد".to_string())
 }
 
 /// Open first, then by day, undated last.
@@ -50,31 +50,31 @@ pub fn list(conn: &Connection, include_done: bool) -> Res<Vec<TaskRow>> {
                       CASE WHEN t.day IS NULL THEN 1 ELSE 0 END ASC,
                       t.day ASC, t.id ASC"
         ))
-        .map_err(|e| format!("خواندن کارها نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     let rows = stmt
         .query_map([include_done], from_row)
-        .map_err(|e| format!("خواندن کارها نشد: {e}"))?
+        .map_err(|_| "دفتر خوانده نشد".to_string())?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن کارها نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     Ok(rows)
 }
 
-/// `day: 0` and `partyId: 0` mean «no date» and «no party»; leaving them out
-/// on an edit keeps what was there.
-
+/// A party the reminder is about, if there is one.
 fn ensure_party(conn: &Connection, party_id: i64) -> Res<()> {
     let known: Option<i64> = conn
         .query_row("SELECT id FROM party WHERE id = ?1", [party_id], |r| {
             r.get(0)
         })
         .optional()
-        .map_err(|e| format!("خواندن طرف حساب نشد: {e}"))?;
+        .map_err(|_| "دفتر خوانده نشد".to_string())?;
     if known.is_none() {
-        return Err("این طرف حساب پیدا نشد".to_string());
+        return Err("طرف حساب پیدا نشد".to_string());
     }
     Ok(())
 }
 
+/// Creates or edits a reminder. `day: 0` and `partyId: 0` mean «no date» and
+/// «no party»; leaving them out on an edit keeps what was there.
 pub fn save(conn: &Connection, input: &TaskInput) -> Res<Task> {
     let old = match input.id {
         Some(id) => Some(one(conn, id)?.task),
@@ -83,7 +83,7 @@ pub fn save(conn: &Connection, input: &TaskInput) -> Res<Task> {
 
     let text = input.text.trim();
     if text.is_empty() {
-        return Err("متن کار را بنویسید".to_string());
+        return Err("متن کار را بنویس".to_string());
     }
 
     let day = match input.day {
@@ -109,7 +109,7 @@ pub fn save(conn: &Connection, input: &TaskInput) -> Res<Task> {
                 "UPDATE task SET text = ?1, day = ?2, party_id = ?3, done = ?4 WHERE id = ?5",
                 params![text, day, party_id, done, task.id],
             )
-            .map_err(|e| format!("ذخیره کار نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             task.id
         }
         None => {
@@ -117,7 +117,7 @@ pub fn save(conn: &Connection, input: &TaskInput) -> Res<Task> {
                 "INSERT INTO task(text, day, party_id, done, created_at) VALUES(?1, ?2, ?3, ?4, ?5)",
                 params![text, day, party_id, done, db::now_ms()],
             )
-            .map_err(|e| format!("ذخیره کار نشد: {e}"))?;
+            .map_err(|_| "ذخیره نشد".to_string())?;
             conn.last_insert_rowid()
         }
     };
@@ -131,7 +131,7 @@ pub fn toggle(conn: &Connection, id: i64) -> Res<Task> {
         "UPDATE task SET done = ?1 WHERE id = ?2",
         params![!task.done, id],
     )
-    .map_err(|e| format!("تغییر کار نشد: {e}"))?;
+    .map_err(|_| "ذخیره نشد".to_string())?;
     Ok(one(conn, id)?.task)
 }
 
@@ -139,9 +139,9 @@ pub fn toggle(conn: &Connection, id: i64) -> Res<Task> {
 pub fn remove(conn: &Connection, id: i64) -> Res<bool> {
     let gone = conn
         .execute("DELETE FROM task WHERE id = ?1", [id])
-        .map_err(|e| format!("پاک کردن کار نشد: {e}"))?;
+        .map_err(|_| "پاک نشد".to_string())?;
     if gone == 0 {
-        return Err("این کار پیدا نشد".to_string());
+        return Err("کار پیدا نشد".to_string());
     }
     Ok(true)
 }
@@ -167,31 +167,31 @@ struct IdArgs {
 pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
         "tasks.list" => (|| {
-            let a: ListArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "فهرست کارها خوانده نشد".to_string())?;
+            let a: ListArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(
                 serde_json::to_value(list(&conn, a.include_done.unwrap_or(false))?)
-                    .map_err(|e| format!("خواندن کارها نشد: {e}"))?,
+                    .map_err(|_| "مشکلی پیش آمد".to_string())?,
             )
         })(),
         "tasks.save" => (|| {
-            let a: SaveArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "اطلاعات کار خوانده نشد".to_string())?;
+            let a: SaveArgs =
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(save(&conn, &a.task)?)
-                .map_err(|e| format!("ذخیره کار نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "tasks.toggle" => (|| {
             let a: IdArgs =
-                serde_json::from_value(args.clone()).map_err(|_| "کار پیدا نشد".to_string())?;
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(serde_json::to_value(toggle(&conn, a.id)?)
-                .map_err(|e| format!("تغییر کار نشد: {e}"))?)
+                .map_err(|_| "مشکلی پیش آمد".to_string())?)
         })(),
         "tasks.remove" => (|| {
             let a: IdArgs =
-                serde_json::from_value(args.clone()).map_err(|_| "کار پیدا نشد".to_string())?;
+                serde_json::from_value(args.clone()).map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             Ok(Value::Bool(remove(&conn, a.id)?))
         })(),

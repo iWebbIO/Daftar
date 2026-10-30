@@ -107,7 +107,13 @@ export default function Cheques() {
       <Head
         title="چک‌ها"
         onBack={nav.back}
-        sub={pending.length > 0 ? `${fa(pending.length)} چک در جریان` : "چکی در جریان نیست"}
+        sub={
+          groups.overdue.length > 0
+            ? `${fa(groups.overdue.length)} چک گذشته`
+            : pending.length > 0
+              ? `${fa(pending.length)} چک در جریان`
+              : "چکی در جریان نیست"
+        }
       />
 
       <Body>
@@ -198,13 +204,20 @@ function ChequeRowView({ row, onPick }: { row: ChequeRow; onPick?: (row: ChequeR
   const { cheque, partyName } = row;
   const meta = WORDS[cheque.status];
   const incoming = cheque.direction === "in";
+  // When it comes due is the whole story: «فردا» first, then how he knows it.
+  const late = cheque.status === "pending" && cheque.dueDay < today();
+  const note = late ? (
+    <Pill tone="warn">گذشته</Pill>
+  ) : cheque.status === "pending" ? undefined : (
+    <Pill tone={meta.tone}>{meta.word}</Pill>
+  );
   return (
     <Row
       title={partyName}
-      sub={`${incoming ? "می‌گیرم" : "می‌دهم"} · ${cheque.bank ?? "چک"} · ${when(cheque.dueDay)}`}
+      sub={`${when(cheque.dueDay)} · ${cheque.bank ?? "چک"} · ${incoming ? "می‌گیرم" : "می‌دهم"}`}
       value={fmtAmount(cheque.amount)}
       tone={incoming ? "pos" : "neg"}
-      note={<Pill tone={meta.tone}>{meta.word}</Pill>}
+      note={note}
       onClick={onPick ? () => onPick(row) : undefined}
     />
   );
