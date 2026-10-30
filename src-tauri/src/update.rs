@@ -252,8 +252,7 @@ pub fn evaluate(current: &str, release: &Value) -> UpdateInfo {
 }
 
 /// The check itself, without a network of its own: a stub here in the tests.
-pub fn check_with(github: &dyn Github) -> UpdateInfo {
-    let current = env!("DAFTAR_VERSION");
+pub fn check_with(current: &str, github: &dyn Github) -> UpdateInfo {
     match github.release() {
         Ok(release) => evaluate(current, &release),
         // Not an error. The sentence says what happened and nothing else, and
@@ -294,7 +293,7 @@ fn startup_with(ctx: &Ctx<'_>, github: &dyn Github) -> Option<UpdateInfo> {
         };
     }
 
-    let info = check_with(github);
+    let info = check_with(current, github);
     remember(ctx, &info);
     if info.behind {
         Some(info)
@@ -337,9 +336,9 @@ fn remember(ctx: &Ctx<'_>, info: &UpdateInfo) {
 /// The bytes go to `<name>.apk.part` first; only a complete file is renamed to
 /// `<name>.apk`. A half-written file that another app could be asked to install
 /// is exactly what this avoids.
-pub fn download_with(ctx: &Ctx<'_>, github: &dyn Github) -> Res<Downloaded> {
+pub fn download_with(ctx: &Ctx<'_>, current: &str, github: &dyn Github) -> Res<Downloaded> {
     let release = github.release()?;
-    let info = evaluate(env!("DAFTAR_VERSION"), &release);
+    let info = evaluate(current, &release);
     if !info.behind {
         return Err("نسخه جدیدی نیست".to_string());
     }
@@ -403,9 +402,9 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     let _ = args;
     Some(match op {
         // Always fresh: he pressed the button himself.
-        "update.check" => (|| json_of(check_with(&Http)))(),
+        "update.check" => (|| json_of(check_with(env!("DAFTAR_VERSION"), &Http)))(),
         "update.download" => (|| {
-            let got = download_with(ctx, &Http)?;
+            let got = download_with(ctx, env!("DAFTAR_VERSION"), &Http)?;
             json_of(got)
         })(),
         _ => return None,
@@ -432,15 +431,13 @@ mod tests {
     use super::*;
     use std::cell::RefCell;
 
+    /// A fixed version for every test: the suite must not move when the app does.
+    const CURRENT: &str = "0.1.0";
+
     /// A release tag that is always newer than the build running the tests.
     /// Pinning a literal here meant that cutting that release broke the suite.
     fn newer_tag() -> String {
-        let major: u32 = env!("DAFTAR_VERSION")
-            .split('.')
-            .next()
-            .and_then(|m| m.parse().ok())
-            .unwrap_or(0);
-        format!("v{}.0.0", major + 1)
+        format!("v{}.0.0", 1)
     }
 
     fn newer_version() -> String {
@@ -557,7 +554,7 @@ mod tests {
     #[test]
     fn no_network_is_not_an_error() {
         let offline = Stub::failing("به اینترنت وصل نشد");
-        let info = check_with(&offline);
+        let info = check_with(CURRENT, &offline);
 
         assert!(!info.behind, "an unreachable GitHub is never an update");
         assert_eq!(info.latest, "");
@@ -572,7 +569,7 @@ mod tests {
         // A rate limit is the same shape, with its own sentence. Nothing in it
         // names a website he has never heard of.
         let limited = Stub::failing("الان نمی‌توانم نسخه جدید را ببینم");
-        let info = check_with(&limited);
+        let info = check_with(CURRENT, &limited);
         assert!(!info.behind);
         assert_eq!(info.notes, "الان نمی‌توانم نسخه جدید را ببینم");
         assert!(!info.notes.contains("گیت"), "no English brand in his copy");
@@ -584,7 +581,7 @@ mod tests {
             &newer_tag(),
             &[(&apk_name(), "https://example.test/a.apk")],
         ));
-        let info = check_with(&github);
+        let info = check_with(CURRENT, &github);
         assert!(info.behind);
         assert_eq!(info.latest, newer_version());
     }
@@ -601,7 +598,7 @@ mod tests {
         ))
         .with_bytes(bytes.clone());
 
-        let got = download_with(&bench.ctx(), &github).unwrap();
+        let got = download_with(&bench.ctx(), CURRENT, &github).unwrap();
 
         let path = std::path::Path::new(&got.path);
         assert_eq!(
@@ -628,7 +625,7 @@ mod tests {
         ))
         .breaking_after(7);
 
-        let why = download_with(&bench.ctx(), &github).unwrap_err();
+        let why = download_with(&bench.ctx(), CURRENT, &github).unwrap_err();
         assert_eq!(why, "نسخه جدید دانلود نشد");
         assert!(
             bench.files().is_empty(),
@@ -646,7 +643,7 @@ mod tests {
         ))
         .with_bytes(b"old".to_vec());
 
-        let why = download_with(&bench.ctx(), &github).unwrap_err();
+        let why = download_with(&bench.ctx(), CURRENT, &github).unwrap_err();
         assert_eq!(why, "نسخه جدیدی نیست");
         assert!(bench.files().is_empty());
     }
