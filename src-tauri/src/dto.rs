@@ -71,7 +71,7 @@ pub struct DocLine {
 
 /// What the order screen sends to be saved. `id` is absent for a new document.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct LineInput {
     pub id: Option<i64>,
     pub product_id: Option<i64>,
@@ -85,7 +85,7 @@ pub struct LineInput {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct DocInput {
     pub id: Option<i64>,
     pub kind: String,
@@ -161,7 +161,7 @@ pub struct Payment {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct PaymentInput {
     pub id: Option<i64>,
     pub party_id: i64,
@@ -177,7 +177,7 @@ pub struct PaymentInput {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct AllocationInput {
     pub doc_id: i64,
     pub amount: i64,
@@ -402,6 +402,10 @@ pub struct Settings {
     pub shop_name: String,
     pub shop_phone: String,
     pub shop_address: String,
+    /// Printed on the invoice so a customer can pay by card.
+    pub bank_name: String,
+    pub card_holder: String,
+    pub card_number: String,
     pub invoice_note: String,
     pub round_step: i64,
     pub bot_token: String,

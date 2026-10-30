@@ -390,9 +390,19 @@ fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
     serde_json::to_value(value).map_err(|e| format!("آماده کردن پاسخ نشد: {e}"))
 }
 
-#[derive(Deserialize)]
-struct SaveArgs {
-    input: PaymentInput,
+/// What the payment screen sends. `types.ts` marks `ref` and `note` optional,
+/// and a screen that pays without choosing invoices simply leaves the list off —
+/// which means "spread it over the oldest debts", not a refused save.
+fn payment_input(args: &Value) -> Res<PaymentInput> {
+    let mut input = args.get("input").cloned().unwrap_or(Value::Null);
+    if let Value::Object(fields) = &mut input {
+        fields.entry("method").or_insert(Value::from("cash"));
+        fields.entry("allocations").or_insert(Value::Array(Vec::new()));
+        fields.entry("amount").or_insert(Value::from(0));
+        fields.entry("day").or_insert(Value::from(0));
+        fields.entry("direction").or_insert(Value::from(""));
+    }
+    serde_json::from_value(input).map_err(|_| "ورودی خوانده نشد".to_string())
 }
 
 #[derive(Deserialize)]
@@ -421,9 +431,9 @@ struct SuggestArgs {
 pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
         "payments.save" => (|| {
-            let a: SaveArgs = read(args)?;
+            let input = payment_input(args)?;
             let conn = ctx.conn()?;
-            json_of(save(&conn, &a.input)?)
+            json_of(save(&conn, &input)?)
         })(),
         "payments.void" => (|| {
             let a: VoidArgs = read(args)?;

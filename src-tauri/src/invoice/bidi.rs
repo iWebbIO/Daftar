@@ -12,8 +12,11 @@
 //!   are ordinary punctuation otherwise («خریدار: لیلا امینی», where the colon
 //!   has to stay glued to the word on its right).
 //! * Everything else (spaces, `، ؛ ؟ ! ( ) « »` and the zero-width non-joiner)
-//!   is neutral and takes the direction of the last strong character before it,
-//!   or the paragraph direction at the start of a line.
+//!   is neutral. A neutral takes the direction of its neighbours when both are
+//!   the same, and the paragraph direction when they differ — the Unicode rule
+//!   known as N1/N2, and the reason the space in «۱۵ کیلو» and in
+//!   «۳۰ بهمن ۱۴۰۳» stays where it was typed instead of sliding to the far end
+//!   of the number.
 //!
 //! A line becomes a list of [`Run`]s, each with one direction. The layout shapes
 //! every run on its own and then places them along the line: for a
@@ -86,59 +89,70 @@ pub struct Run<'a> {
 /// word.
 pub fn runs(text: &str, para: Dir) -> Vec<Run<'_>> {
     let chars: Vec<(usize, char)> = text.char_indices().collect();
-    let mut out: Vec<Run<'_>> = Vec::new();
-    let mut last = para;
-    let mut start = 0usize;
-    let mut cur: Option<Dir> = None;
+    if chars.is_empty() {
+        return Vec::new();
+    }
 
-    for (n, &(i, c)) in chars.iter().enumerate() {
-        let dir = match classify(c) {
-            Class::Rtl => {
-                last = Dir::Rtl;
-                Dir::Rtl
-            }
-            Class::Ltr | Class::Num => {
-                last = Dir::Ltr;
-                Dir::Ltr
-            }
-            Class::Sep => {
-                // A separator touching a digit is part of that number;
-                // otherwise it is punctuation and follows the text around it.
-                let before = n.checked_sub(1).map(|p| chars[p].1);
-                let after = chars.get(n + 1).map(|p| p.1);
-                if before.is_some_and(is_digit) || after.is_some_and(is_digit) {
-                    last = Dir::Ltr;
-                    Dir::Ltr
-                } else {
-                    last
+    // Which characters carry a direction of their own. `None` is neutral: a
+    // space, a bracket, a comma that is a comma and not a number.
+    let strong: Vec<Option<Dir>> = chars
+        .iter()
+        .enumerate()
+        .map(|(n, &(_, c))| strong_dir(c, &chars, n))
+        .collect();
+
+    // A neutral takes the direction of its neighbours when both agree, and the
+    // paragraph direction when they differ — Unicode's N1 and N2. Without that
+    // the space in «۱۵ کیلو» would ride along with the number to the wrong side.
+    let dirs: Vec<Dir> = (0..chars.len())
+        .map(|i| match strong[i] {
+            Some(dir) => dir,
+            None => {
+                let before = strong[..i].iter().rev().find_map(|dir| *dir);
+                let after = strong[i + 1..].iter().find_map(|dir| *dir);
+                match (before, after) {
+                    (Some(left), Some(right)) if left == right => left,
+                    _ => para,
                 }
             }
-            Class::Neutral => last,
-        };
-        match cur {
-            None => {
-                cur = Some(dir);
-                start = i;
-            }
-            Some(open) if open != dir => {
-                out.push(Run {
-                    text: &text[start..i],
-                    dir: open,
-                });
-                cur = Some(dir);
-                start = i;
-            }
-            Some(_) => {}
+        })
+        .collect();
+
+    let mut out: Vec<Run<'_>> = Vec::new();
+    let mut start = 0usize;
+    for i in 1..=chars.len() {
+        let at_end = i == chars.len();
+        if at_end || dirs[i] != dirs[start] {
+            let from = chars[start].0;
+            let to = if at_end { text.len() } else { chars[i].0 };
+            out.push(Run {
+                text: &text[from..to],
+                dir: dirs[start],
+            });
+            start = i;
         }
     }
-
-    if let Some(dir) = cur {
-        out.push(Run {
-            text: &text[start..],
-            dir,
-        });
-    }
     out
+}
+
+/// The direction a character brings to its line, or `None` if it has none.
+fn strong_dir(c: char, chars: &[(usize, char)], n: usize) -> Option<Dir> {
+    match classify(c) {
+        Class::Rtl => Some(Dir::Rtl),
+        Class::Ltr | Class::Num => Some(Dir::Ltr),
+        Class::Sep => {
+            // A separator touching a digit is part of that number; otherwise it
+            // is punctuation and has no direction of its own.
+            let before = n.checked_sub(1).map(|p| chars[p].1);
+            let after = chars.get(n + 1).map(|p| p.1);
+            if before.is_some_and(is_digit) || after.is_some_and(is_digit) {
+                Some(Dir::Ltr)
+            } else {
+                None
+            }
+        }
+        Class::Neutral => None,
+    }
 }
 
 #[cfg(test)]
@@ -154,12 +168,47 @@ mod tests {
 
     #[test]
     fn a_number_is_its_own_left_to_right_run() {
+        // The spaces around the number are neutral. Each has a Persian word on
+        // one side and a number on the other, so they fall back to the
+        // paragraph direction and stay with the words — which is what keeps
+        // them on the correct side of the digits.
         assert_eq!(
             dirs("جمع کل ۵٬۱۷۵ تومان"),
             vec![
                 (Dir::Rtl, "جمع کل "),
-                (Dir::Ltr, "۵٬۱۷۵ "),
-                (Dir::Rtl, "تومان"),
+                (Dir::Ltr, "۵٬۱۷۵"),
+                (Dir::Rtl, " تومان"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_quantity_keeps_its_space() {
+        // «۱۵ کیلو» — the space sits between a number and a word, so it belongs
+        // to the word. Left with the number it would end up on the far side and
+        // print as «۱۵کیلو».
+        assert_eq!(
+            dirs("۱۵ کیلو"),
+            vec![(Dir::Ltr, "۱۵"), (Dir::Rtl, " کیلو")]
+        );
+    }
+
+    #[test]
+    fn a_date_keeps_both_of_its_spaces() {
+        assert_eq!(
+            dirs("۳۰ بهمن ۱۴۰۳"),
+            vec![
+                (Dir::Ltr, "۳۰"),
+                (Dir::Rtl, " بهمن "),
+                (Dir::Ltr, "۱۴۰۳"),
+            ]
+        );
+        assert_eq!(
+            dirs("۸ آبان ۱۴۰۵"),
+            vec![
+                (Dir::Ltr, "۸"),
+                (Dir::Rtl, " آبان "),
+                (Dir::Ltr, "۱۴۰۵"),
             ]
         );
     }
@@ -177,8 +226,8 @@ mod tests {
             dirs("مانده حساب: ۱۰٬۸۷۵ تومان"),
             vec![
                 (Dir::Rtl, "مانده حساب: "),
-                (Dir::Ltr, "۱۰٬۸۷۵ "),
-                (Dir::Rtl, "تومان"),
+                (Dir::Ltr, "۱۰٬۸۷۵"),
+                (Dir::Rtl, " تومان"),
             ]
         );
     }
@@ -198,8 +247,8 @@ mod tests {
             dirs("برنج Thai ۵ کیلو"),
             vec![
                 (Dir::Rtl, "برنج "),
-                (Dir::Ltr, "Thai ۵ "),
-                (Dir::Rtl, "کیلو"),
+                (Dir::Ltr, "Thai ۵"),
+                (Dir::Rtl, " کیلو"),
             ]
         );
     }

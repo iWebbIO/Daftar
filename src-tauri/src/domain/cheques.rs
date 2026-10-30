@@ -6,7 +6,8 @@
 //! puts the money back exactly where it was.
 
 use crate::db::{self, Res};
-use crate::dto::{Cheque, ChequeInput, ChequeRow};
+use crate::domain::{orders, payments};
+use crate::dto::{Cheque, ChequeInput, ChequeRow, PaymentInput};
 use crate::Ctx;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
@@ -99,7 +100,10 @@ fn live_payment(conn: &Connection, payment_id: Option<i64>) -> Res<Option<i64>> 
     .map_err(|e| format!("خواندن پرداخت چک نشد: {e}"))
 }
 
-/// A corrected cheque must not leave its payment telling a different story.
+/// A corrected cheque must not leave its payment telling a different story. When
+/// the money itself changes, the payment is re-recorded and re-spread oldest
+/// first over the party's open invoices — the same rule a typed-in payment
+/// follows — so no invoice is left paid with money that has moved.
 fn sync_payment(
     conn: &Connection,
     payment_id: i64,
@@ -108,47 +112,33 @@ fn sync_payment(
     amount: i64,
     reference: Option<&str>,
 ) -> Res<()> {
-    let (current_party, current_direction, current_amount, current_ref): (
-        i64,
-        String,
-        i64,
-        Option<String>,
-    ) = conn
-        .query_row(
-            "SELECT party_id, direction, amount, ref FROM payment WHERE id = ?1",
-            [payment_id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-        )
-        .map_err(|e| format!("خواندن پرداخت چک نشد: {e}"))?;
-    if current_party == party_id
-        && current_direction == direction
-        && current_amount == amount
-        && current_ref.as_deref() == reference
+    let current = payments::load(conn, payment_id)?;
+    if current.party_id != party_id {
+        return Err("چکی که باز شده را نمی‌شود به طرف‌حساب دیگری برد".to_string());
+    }
+    let reference = reference
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+        .map(str::to_string);
+    if current.direction == direction && current.amount == amount && current.reference == reference
     {
+        // Only a note or a bank name changed: the money stays where it landed.
         return Ok(());
     }
-    let allocated: i64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(amount), 0) FROM allocation WHERE payment_id = ?1",
-            [payment_id],
-            |r| r.get(0),
-        )
-        .map_err(|e| format!("خواندن پرداخت چک نشد: {e}"))?;
-    if allocated > 0 {
-        return Err("این چک به فاکتور وصل شده؛ اول خودِ پرداخت را اصلاح کنید".to_string());
-    }
-    conn.execute(
-        "UPDATE payment SET party_id = ?1, direction = ?2, amount = ?3, ref = ?4
-         WHERE id = ?5 AND voided = 0",
-        params![party_id, direction, amount, reference, payment_id],
-    )
-    .map_err(|e| format!("اصلاح پرداخت چک نشد: {e}"))?;
-    db::audit(
+    payments::record(
         conn,
-        "payment",
-        payment_id,
-        "update",
-        &json!({ "amount": amount, "direction": direction, "source": "cheque" }).to_string(),
+        &PaymentInput {
+            id: Some(payment_id),
+            party_id,
+            direction: direction.to_string(),
+            amount,
+            day: current.day,
+            method: "cheque".to_string(),
+            reference,
+            note: current.note.clone(),
+            allocations: Vec::new(),
+        },
+        true,
     )?;
     Ok(())
 }
@@ -278,10 +268,13 @@ pub fn save(conn: &Connection, input: &ChequeInput) -> Res<Cheque> {
 
 /// Moves a cheque to a new status and does the money work for it.
 ///
-/// * `cleared` — creates the payment the cheque stands for (or reuses the live
-///   one) and points `payment_id` at it. A second `cleared` changes nothing.
-/// * `bounced` / `returned` — voids that payment with a plain reason. A bounced
-///   cheque forgets the payment; a returned one keeps the record of it.
+/// * `cleared` — records the payment the cheque stands for, spread over the
+///   party's oldest open invoices of the matching kind the way a typed-in
+///   payment is, and points `payment_id` at it. Whatever the invoices cannot
+///   absorb stays as credit. A second `cleared` changes nothing.
+/// * `bounced` / `returned` — voids that payment with a plain reason, and the
+///   invoices it had paid go back to what they were. A bounced cheque forgets
+///   the payment; a returned one keeps the record of it.
 /// * `pending` — puts a settled cheque back on the stack, voiding its payment.
 pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) -> Res<Cheque> {
     let status = status.trim();
@@ -306,29 +299,24 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
             let payment_id = match live {
                 Some(payment_id) => payment_id,
                 None => {
-                    tx.execute(
-                        "INSERT INTO payment(party_id, direction, amount, day, method, ref, note,
-                                             voided, void_reason, created_at)
-                         VALUES(?1, ?2, ?3, ?4, 'cheque', ?5, NULL, 0, NULL, ?6)",
-                        params![
-                            before.party_id,
-                            before.direction,
-                            before.amount,
-                            day,
-                            before.number,
-                            db::now_ms()
-                        ],
-                    )
-                    .map_err(|e| format!("ثبت پرداخت چک نشد: {e}"))?;
-                    let payment_id = tx.last_insert_rowid();
-                    db::audit(
+                    // The slip is money now: it pays down the oldest invoice of
+                    // its kind first, and only what is left over is credit.
+                    let payment = payments::record(
                         &tx,
-                        "payment",
-                        payment_id,
-                        "create",
-                        &json!({ "amount": before.amount, "day": day, "cheque": id }).to_string(),
+                        &PaymentInput {
+                            id: None,
+                            party_id: before.party_id,
+                            direction: before.direction.clone(),
+                            amount: before.amount,
+                            day,
+                            method: "cheque".to_string(),
+                            reference: before.number.clone(),
+                            note: None,
+                            allocations: Vec::new(),
+                        },
+                        true,
                     )?;
-                    payment_id
+                    payment.id
                 }
             };
             tx.execute(
@@ -351,11 +339,27 @@ pub fn set_status(conn: &Connection, id: i64, status: &str, day: Option<i64>) ->
                 _ => "چک دوباره در انتظار شد",
             };
             if let Some(payment_id) = live {
+                // The money is gone from the balance, so the invoices it had
+                // paid must stop saying they were paid.
+                let touched: Vec<i64> = {
+                    let mut stmt = tx
+                        .prepare("SELECT DISTINCT doc_id FROM allocation WHERE payment_id = ?1")
+                        .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?;
+                    let found = stmt
+                        .query_map([payment_id], |r| r.get(0))
+                        .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?;
+                    found
+                };
                 tx.execute(
                     "UPDATE payment SET voided = 1, void_reason = ?1 WHERE id = ?2 AND voided = 0",
                     params![reason, payment_id],
                 )
                 .map_err(|e| format!("ابطال پرداخت چک نشد: {e}"))?;
+                for doc_id in touched {
+                    orders::refresh_status(&tx, doc_id)?;
+                }
                 db::audit(
                     &tx,
                     "payment",
@@ -501,11 +505,27 @@ mod tests {
         assert_eq!(payment_count(&conn), 1);
         assert_eq!(balance::of(&conn, 1).unwrap(), 7_000);
 
+        // The invoice the slip was handed over for is paid down, not skipped.
+        let doc = orders::load(&conn, 1).unwrap();
+        assert_eq!((doc.paid, doc.remaining), (3_000, 7_000));
+
         // Saying «cleared» twice must not count the money twice.
         let again = set_status(&conn, cheque.id, "cleared", Some(20013)).unwrap();
         assert_eq!(again.payment_id, Some(payment_id));
         assert_eq!(payment_count(&conn), 1);
         assert_eq!(balance::of(&conn, 1).unwrap(), 7_000);
+
+        // …and must not pay the invoice a second helping either.
+        let doc = orders::load(&conn, 1).unwrap();
+        assert_eq!((doc.paid, doc.remaining), (3_000, 7_000));
+        let allocations: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM allocation WHERE payment_id = ?1",
+                [payment_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(allocations, 1, "one payment, one share of one invoice");
 
         // The payment is the shop's own record of that cheque.
         let (method, reference, amount, day): (String, Option<String>, i64, i64) = conn
@@ -531,6 +551,7 @@ mod tests {
         let cleared = set_status(&conn, cheque.id, "cleared", Some(20012)).unwrap();
         let payment_id = cleared.payment_id.unwrap();
         assert_eq!(balance::of(&conn, 1).unwrap(), 7_000);
+        assert_eq!(orders::load(&conn, 1).unwrap().paid, 3_000);
 
         let bounced = set_status(&conn, cheque.id, "bounced", None).unwrap();
         assert_eq!(bounced.status, "bounced");
@@ -541,6 +562,11 @@ mod tests {
             1,
             "the payment is voided, not deleted"
         );
+
+        // The invoice goes back to owing the whole of it.
+        let doc = orders::load(&conn, 1).unwrap();
+        assert_eq!((doc.paid, doc.remaining), (0, 10_000));
+        assert_eq!(doc.status, "open");
 
         let (voided, reason): (i64, Option<String>) = conn
             .query_row(
@@ -572,6 +598,51 @@ mod tests {
         // Credit: money received that no invoice has used up yet.
         assert_eq!(balance::of(&conn, 2).unwrap(), -5_000);
         assert_eq!(payment_count(&conn), 1);
+        let allocations: i64 = conn
+            .query_row("SELECT COUNT(*) FROM allocation", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            allocations, 0,
+            "with nothing to pay, the whole cheque is credit"
+        );
+    }
+
+    #[test]
+    fn a_cleared_cheque_pays_the_invoice_it_was_handed_over_for() {
+        let conn = db::memory();
+        seed(&conn);
+        a_debt_of_ten_thousand(&conn);
+
+        let cheque = new_cheque(&conn, 1, 10_000, 20010);
+        set_status(&conn, cheque.id, "cleared", Some(20012)).unwrap();
+
+        let doc = orders::load(&conn, 1).unwrap();
+        assert_eq!(doc.paid, 10_000);
+        assert_eq!(doc.remaining, 0);
+        assert_eq!(doc.status, "settled", "a paid invoice stops being open");
+        assert_eq!(balance::of(&conn, 1).unwrap(), 0);
+    }
+
+    #[test]
+    fn the_oldest_invoice_is_paid_first_and_no_further() {
+        let conn = db::memory();
+        seed(&conn);
+        conn.execute_batch(
+            "INSERT INTO doc(id, kind, jyear, number, party_id, day, status, total, created_at, updated_at)
+             VALUES(1, 'sale', 1404, 1, 1, 20000, 'open', 5000, 0, 0);
+             INSERT INTO doc(id, kind, jyear, number, party_id, day, status, total, created_at, updated_at)
+             VALUES(2, 'sale', 1404, 2, 1, 20001, 'open', 5000, 0, 0);",
+        )
+        .unwrap();
+
+        let cheque = new_cheque(&conn, 1, 7_000, 20010);
+        set_status(&conn, cheque.id, "cleared", Some(20012)).unwrap();
+
+        let old = orders::load(&conn, 1).unwrap();
+        let new = orders::load(&conn, 2).unwrap();
+        assert_eq!((old.paid, old.status.as_str()), (5_000, "settled"));
+        assert_eq!((new.paid, new.remaining), (2_000, 3_000));
+        assert_eq!(balance::of(&conn, 1).unwrap(), 3_000);
     }
 
     #[test]
@@ -606,6 +677,8 @@ mod tests {
 
         set_status(&conn, cheque.id, "cleared", Some(20005)).unwrap();
         assert_eq!(balance::of(&conn, 2).unwrap(), 0);
+        // Money paid out settles the purchase, not a sale.
+        assert_eq!(orders::load(&conn, 9).unwrap().status, "settled");
     }
 
     #[test]
@@ -683,6 +756,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(balance::of(&conn, 1).unwrap(), 6_000);
+        assert_eq!(
+            orders::load(&conn, 1).unwrap().remaining,
+            6_000,
+            "the invoice follows the corrected amount"
+        );
 
         let payment_amount: i64 = conn
             .query_row(
@@ -692,5 +770,14 @@ mod tests {
             )
             .unwrap();
         assert_eq!(payment_amount, 4_000);
+
+        let allocated: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(amount), 0) FROM allocation WHERE payment_id = ?1",
+                [cleared.payment_id.unwrap()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(allocated, 4_000, "the share moved with the money");
     }
 }

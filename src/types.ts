@@ -199,6 +199,14 @@ export interface SumRow {
   struck: boolean;
 }
 
+export interface SumRowInput {
+  id?: number;
+  label: string;
+  amount: number;
+  partyId?: number | null;
+  struck: boolean;
+}
+
 export interface SumSheet {
   id: number;
   day: number;
@@ -251,6 +259,10 @@ export interface Settings {
   shopName: string;
   shopPhone: string;
   shopAddress: string;
+  /** Printed on the invoice so a customer can pay by card. */
+  bankName: string;
+  cardHolder: string;
+  cardNumber: string;
   invoiceNote: string;
   roundStep: number;
   botToken: string;

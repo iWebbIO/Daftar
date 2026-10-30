@@ -1,0 +1,196 @@
+/* گزارش — three questions in the order he asks them. */
+
+.rp-q {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 20px 4px 9px;
+  letter-spacing: -0.01em;
+}
+
+.rp-note {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin: 8px 4px 0;
+}
+
+/* -------------------------------------------------------- «چقدر فروختم؟» */
+
+.rp-hero {
+  padding: 16px 16px 6px;
+}
+
+.rp-hero__label {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.rp-hero__money {
+  margin: 0 0 10px;
+  display: block;
+}
+
+.rp-lines {
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.rp-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.rp-line__label {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.rp-line.is-zero {
+  opacity: 0.55;
+}
+
+/* --------------------------------------------- «کی پول من را نداده؟» */
+
+.rp-age {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.rp-age + .rp-age {
+  border-top: 1px solid var(--line);
+}
+
+.rp-age.is-zero {
+  opacity: 0.55;
+}
+
+.rp-age__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-age__label {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.rp-age__count {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+.rp-age__track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+.rp-age__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--negative);
+  opacity: 0.75;
+}
+
+.rp-age__money {
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--negative);
+}
+
+.rp-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 9px 4px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.rp-total .num {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--negative);
+}
+
+.rp-quiet {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.9;
+  padding: 14px;
+}
+
+/* ------------------------------------- «چه چیزی بیشتر فروش داشته؟» */
+
+.rp-prod {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+}
+
+.rp-prod + .rp-prod {
+  border-top: 1px solid var(--line);
+}
+
+.rp-prod__rank {
+  flex: 0 0 16px;
+  font-size: 11.5px;
+  color: var(--faint);
+  text-align: center;
+}
+
+.rp-prod__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-prod__name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-prod__qty {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.rp-prod__track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.rp-prod__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--brand);
+  opacity: 0.45;
+}
+
+.rp-prod__money {
+  flex: 0 0 auto;
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--ink);
+}

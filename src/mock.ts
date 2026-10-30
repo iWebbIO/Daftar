@@ -34,7 +34,7 @@ import type {
   TodayView,
   Totals,
 } from "./types";
-import { g2d, today } from "./jalali";
+import { g2d, longDate, today } from "./jalali";
 import { lineTotal } from "./format";
 
 interface Store {
@@ -264,6 +264,9 @@ function seed(): Store {
       shopName: "خشکبار امینی",
       shopPhone: "۰۹۱۲۳۴۵۶۷۸۹",
       shopAddress: "تهران، بازار آهنگرها",
+      bankName: "بانک ملت",
+      cardHolder: "خشکبار امینی",
+      cardNumber: "۶۰۳۷-۹۹۷۴-۱۲۳۴-۵۶۷۸",
       invoiceNote: "ممنون از خرید شما",
       roundStep: 0,
       botToken: "",
@@ -872,7 +875,7 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
     }
 
     case "invoice.svg":
-      return { svg: "" };
+      return { svg: mockInvoiceSvg(Number(a.docId)) };
     case "invoice.preview":
       return { path: "" };
     case "invoice.send":
@@ -906,3 +909,75 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
 
 /** Only used by the mock so the browser preview shows today's date. */
 export const mockToday = () => g2d(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate());
+
+/**
+ * A stand-in for the page the Rust renderer produces, so the invoice screen can
+ * be looked at in a browser. Same shape as a real فاکتور: shop at the top, the
+ * customer, the table, and the sums on the left.
+ */
+function mockInvoiceSvg(docId: number): string {
+  const s = db();
+  const doc = s.docs.find((d) => d.id === docId) ?? s.docs[0]!;
+  const party = s.parties.find((p) => p.id === doc.partyId);
+  const lines = s.lines[doc.id] ?? [];
+  const W = 420;
+  const H = 595;
+  const ink = "#1b1c14";
+  const muted = "#6d6b60";
+  const line = "#ddd8ca";
+
+  const money = (n: number) =>
+    Math.round(n)
+      .toString()
+      .replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]!)
+      .replace(/\B(?=(\d{3})+(?!\d))/g, "٬");
+
+  // Column edges, right to left. Every cell is anchored at its right edge, the
+  // way an RTL table reads, and each column is wide enough for the longest
+  // number it will hold (nine digits at 11px is about 62pt).
+  const COL = { pos: 396, name: 372, qty: 250, price: 156, total: 60 };
+
+  const rows = lines
+    .slice(0, 14)
+    .map((l, i) => {
+      const y = 268 + i * 26;
+      return `<text x="${COL.pos}" y="${y}" font-size="11" fill="${muted}" text-anchor="end">${money(i + 1)}</text>
+      <text x="${COL.name}" y="${y}" font-size="11" fill="${ink}" text-anchor="end">${l.name}</text>
+      <text x="${COL.qty}" y="${y}" font-size="11" fill="${ink}" text-anchor="end">${money(l.qtyMilli / 1000)} ${l.unit}</text>
+      <text x="${COL.price}" y="${y}" font-size="11" fill="${ink}" text-anchor="end">${money(l.price)}</text>
+      <text x="${COL.total}" y="${y}" font-size="11" fill="${ink}" text-anchor="end">${money(l.total)}</text>
+      <line x1="24" y1="${y + 8}" x2="396" y2="${y + 8}" stroke="${line}" stroke-width="0.6"/>`;
+    })
+    .join("\n");
+
+  const totalY = 268 + Math.min(lines.length, 14) * 26 + 30;
+  const sumLabel = COL.total + 120;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <rect width="${W}" height="${H}" fill="#ffffff"/>
+  <text x="396" y="52" font-size="19" font-weight="bold" fill="${ink}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${s.settings.shopName || "فروشگاه"}</text>
+  <text x="396" y="70" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${s.settings.shopPhone}</text>
+  <text x="396" y="84" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${s.settings.shopAddress}</text>
+  <line x1="24" y1="102" x2="396" y2="102" stroke="${ink}" stroke-width="1"/>
+  <text x="396" y="128" font-size="14" font-weight="bold" fill="${ink}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">فاکتور فروش ${money(doc.number)}</text>
+  <text x="396" y="148" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${longDate(doc.day)}</text>
+  <text x="396" y="176" font-size="11" fill="${ink}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">خریدار: ${party?.name ?? ""}</text>
+  <text x="${COL.pos}" y="212" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">ردیف</text>
+  <text x="${COL.name}" y="212" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">شرح کالا</text>
+  <text x="${COL.qty}" y="212" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">مقدار</text>
+  <text x="${COL.price}" y="212" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">فی</text>
+  <text x="${COL.total}" y="212" font-size="10" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">جمع</text>
+  <line x1="24" y1="224" x2="396" y2="224" stroke="${ink}" stroke-width="0.8"/>
+  ${rows}
+  <line x1="24" y1="${totalY - 12}" x2="396" y2="${totalY - 12}" stroke="${ink}" stroke-width="1"/>
+  <text x="${sumLabel}" y="${totalY + 12}" font-size="11" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">جمع کل</text>
+  <text x="${COL.total}" y="${totalY + 12}" font-size="13" font-weight="bold" fill="${ink}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${money(doc.total)}</text>
+  ${
+    doc.remaining > 0
+      ? `<text x="${sumLabel}" y="${totalY + 36}" font-size="11" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">مانده</text>
+  <text x="${COL.total}" y="${totalY + 36}" font-size="13" font-weight="bold" fill="#a3382a" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${money(doc.remaining)}</text>`
+      : `<text x="${sumLabel}" y="${totalY + 36}" font-size="11" fill="#17614f" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">تسویه شد</text>`
+  }
+  <text x="396" y="${H - 28}" font-size="9" fill="${muted}" text-anchor="end" font-family="Vazirmatn, Tahoma, sans-serif">${s.settings.invoiceNote}</text>
+</svg>`;
+}

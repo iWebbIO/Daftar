@@ -1,0 +1,216 @@
+/* چک‌ها — money coming and money going, with the words that tell them apart. */
+
+.cheques .body {
+  padding-bottom: 10px;
+}
+
+/* A Persian hint and a typed number both belong at the right edge. */
+.cheques input:placeholder-shown,
+.cheques input[inputmode="numeric"] {
+  text-align: right;
+}
+
+/* ------------------------------------------------------------ the two sides */
+
+.ch-sum {
+  display: flex;
+  align-items: stretch;
+  padding: 14px 4px;
+  margin-bottom: 6px;
+}
+
+.ch-sum__side {
+  flex: 1;
+  min-width: 0;
+  padding: 0 14px;
+}
+
+.ch-sum__split {
+  width: 1px;
+  background: var(--line);
+  margin: 2px 0;
+}
+
+.ch-sum__label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.ch-sum__num {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.ch-sum__num--pos {
+  color: var(--positive);
+}
+.ch-sum__num--neg {
+  color: var(--negative);
+}
+
+.ch-sum__meta {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+/* ------------------------------------------------------------------- groups */
+
+.ch-urgent {
+  color: var(--warn);
+}
+
+.ch-closed {
+  opacity: 0.55;
+  margin-top: 6px;
+}
+
+/* -------------------------------------------------------------------- sheet */
+
+.ch-big {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.ch-big__word {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.ch-big__num {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.ch-big__num.is-pos {
+  color: var(--positive);
+}
+.ch-big__num.is-neg {
+  color: var(--negative);
+}
+
+.ch-big__unit {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -2px;
+}
+
+.ch-big__meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.ch-actions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ch-hint {
+  font-size: 11.5px;
+  color: var(--faint);
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ------------------------------------------------------------------ add form */
+
+.ch-picked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ch-link {
+  min-height: 44px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand);
+}
+
+.ch-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 16px;
+}
+
+.ch-pick {
+  min-height: 48px;
+  padding: 0 15px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.ch-pick:active {
+  background: var(--brand-soft);
+}
+
+.ch-echo {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: -6px 4px 14px;
+}
+
+.ch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ch-chip {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background 0.12s var(--ease), border-color 0.12s;
+}
+
+.ch-chip.is-on {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.ch-due {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 4px 18px;
+}
+
+.ch-submit {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0 4px;
+  background: linear-gradient(to top, var(--paper) 78%, transparent);
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.ch-foot {
+  flex: 0 0 auto;
+  padding: 10px var(--pad) 14px;
+  margin-bottom: calc(var(--nav-h) + var(--safe-b));
+  background: linear-gradient(to top, var(--paper) 62%, transparent);
+}

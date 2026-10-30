@@ -1,0 +1,122 @@
+/* کارها — one list, a big box to tick, a thumb's reach to add. */
+
+.tasks .body {
+  padding-bottom: 10px;
+}
+
+/* A Persian hint and a typed number both belong at the right edge. */
+.tasks input:placeholder-shown,
+.tasks input[inputmode="numeric"] {
+  text-align: right;
+}
+
+/* The tick is the workhorse of this screen: a 52px target around a 30px box. */
+.tk-tick {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin-inline-start: -12px;
+}
+
+.tk-tick__box {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1.6px solid var(--line-strong);
+  background: var(--surface);
+  color: transparent;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s;
+}
+
+.tk-tick:active .tk-tick__box {
+  background: var(--positive-soft);
+  border-color: var(--positive);
+  color: var(--positive);
+}
+
+.tk-tick.is-on .tk-tick__box {
+  background: var(--positive);
+  border-color: var(--positive);
+  color: var(--on-brand);
+}
+
+.tk-tick:disabled {
+  opacity: 0.5;
+}
+
+/* What is done is still there, but it stops asking for attention. */
+.tk-done {
+  opacity: 0.5;
+}
+
+.tk-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 26px 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tk-clear svg {
+  color: var(--positive);
+}
+
+/* ------------------------------------------------------------------ sheet */
+
+.tk-label {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 4px 7px;
+}
+
+.tk-picked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tk-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 16px;
+}
+
+.tk-pick {
+  min-height: 48px;
+  padding: 0 15px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background 0.12s var(--ease);
+}
+
+.tk-pick:active {
+  background: var(--brand-soft);
+}
+
+.tk-link {
+  min-height: 44px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand);
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.tk-foot {
+  flex: 0 0 auto;
+  padding: 10px var(--pad) 14px;
+  margin-bottom: calc(var(--nav-h) + var(--safe-b));
+  background: linear-gradient(to top, var(--paper) 62%, transparent);
+}

@@ -1,0 +1,17 @@
+/* جست‌وجو — one box, grouped answers. */
+
+.sr-box .field {
+  margin-bottom: 8px;
+}
+
+/* Whatever he types — a name or an amount — starts at the right edge. */
+.search input {
+  text-align: right;
+}
+
+.sr-wait {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 18px 4px;
+  text-align: center;
+}

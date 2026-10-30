@@ -1,0 +1,92 @@
+/* One person's page: the balance owned the space at the top, the two answers
+   under it, then the lines of the notebook. */
+
+/* The balance is the headline of the page, so it is a step bigger than it is
+   anywhere else. */
+.pv .balance__word {
+  font-size: 13px;
+  margin-bottom: 1px;
+}
+
+.pv .balance__num {
+  font-size: 31px;
+  letter-spacing: -0.02em;
+}
+
+.pv .balance--zero .balance__word {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pv__note {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.pv__acts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* --------------------------------------------------------------- telephone */
+
+.phead-tel {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: var(--positive);
+}
+.phead-tel:active {
+  background: var(--positive-soft);
+}
+
+/* ------------------------------------------------------------ payment sheet */
+
+.sheet-money {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 0 2px;
+}
+
+.sheet-money__label {
+  width: 100%;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.sheet-money__num {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sheet-money__unit {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.pv__sheet-foot {
+  margin-top: 16px;
+}
+
+.pv__void {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.pv__void-acts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}

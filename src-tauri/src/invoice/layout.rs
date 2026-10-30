@@ -131,8 +131,11 @@ impl Page {
     }
 }
 
-/// Where one directional run landed on a typeset line.
+/// Where one directional run landed on a typeset line. The layout itself only
+/// needs the glyphs, but the boxes are what the tests use to prove that a
+/// number really did land between the two words around it.
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub(super) struct RunBox {
     pub x: f32,
     pub width: f32,
@@ -143,6 +146,7 @@ pub(super) struct PlacedLine {
     pub glyphs: Vec<Glyph>,
     pub width: f32,
     /// One box per directional run, in the order the line was written.
+    #[allow(dead_code)]
     pub runs: Vec<RunBox>,
 }
 
@@ -237,6 +241,24 @@ impl Text {
 pub fn num(v: f32) -> String {
     let v = if v.abs() < 0.005 { 0.0 } else { v };
     let mut s = format!("{v:.2}");
+    while s.ends_with('0') {
+        s.pop();
+    }
+    if s.ends_with('.') {
+        s.pop();
+    }
+    if s.is_empty() || s == "-" {
+        s = "0".to_string();
+    }
+    s
+}
+
+/// A matrix coefficient — the multiplier that takes font units to points. It is
+/// a small number (a nine point glyph is 0.0044 of its outline) and rounding it
+/// to two decimals would round it to nothing at all, which draws nothing, so it
+/// gets a writer of its own.
+pub fn num_fine(v: f32) -> String {
+    let mut s = format!("{v:.6}");
     while s.ends_with('0') {
         s.pop();
     }
@@ -459,6 +481,18 @@ pub fn invoice_pages(data: &InvoiceData) -> Vec<Page> {
                 .right(RIGHT),
         );
     }
+
+    // A cancelled document must never look like a live one, even if someone
+    // opens the file from the folder months later.
+    if data.status == "void" {
+        sheet.page.push(
+            line("باطل شده", 9.5, Weight::Medium)
+                .class(Class::Meta)
+                .shade(0.35)
+                .at(118.0)
+                .right(200.0),
+        );
+    }
     sheet.page.rule(LEFT, RIGHT, 129.0, 0.4, 0.87);
 
     invoice_table(&mut sheet, data, sale);
@@ -611,138 +645,167 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         );
 
         if item.voided {
-            sheet.page.rule(LEFT, RIGHT, y - 3.0, 0.5, 0.46);
+            // Struck from the row number to the price, so the words «خط خورده»
+            // in the last column stay readable.
+            sheet.page.rule(COL_TOTAL, RIGHT, y - 3.0, 0.5, 0.46);
         }
-        sheet.page.rule(LEFT, RIGHT, y + 7.0, 0.3, 0.90);
+        // The last row's line is the foot of the table, so it is drawn as an
+        // edge rather than as another hairline.
+        let foot = i + 1 == data.lines.len();
+        sheet.page.rule(
+            LEFT,
+            RIGHT,
+            y + 7.0,
+            if foot { 0.8 } else { 0.3 },
+            if foot { RULE_STRONG } else { 0.90 },
+        );
         sheet.y += ROW_STEP;
     }
 }
 
+/// One line of the totals block: the label against the block's right edge and
+/// the amount against the amount edge, so every figure on the sheet lines up.
+fn tot_line(
+    page: &mut Page,
+    label: &str,
+    amount: &str,
+    y: f32,
+    size: f32,
+    weight: Weight,
+    shade: f32,
+) {
+    page.push(
+        line(label, size, weight)
+            .class(Class::Total)
+            .shade(shade)
+            .at(y)
+            .right(TOT_LABEL),
+    );
+    if !amount.is_empty() {
+        page.push(
+            line(amount, size, weight)
+                .class(Class::Total)
+                .shade(shade)
+                .at(y)
+                .right(TOT_AMOUNT),
+        );
+    }
+}
+
 fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
-    if !sheet.has_room(120.0) {
+    if !sheet.has_room(150.0) {
         sheet.page_break();
         invoice_continuation(sheet, data, sale);
     }
 
-    let base = sheet.y + 10.0;
-    sheet.page.rule(LEFT, RIGHT, base, 0.8, RULE_STRONG);
-    let mut y = base + 18.0;
+    // The block is one column: every rule in it runs from the left margin to
+    // just past the labels, so the whole thing reads as one sum instead of
+    // three unrelated fragments.
+    let base = sheet.y + 12.0;
+    sheet.page.rule(LEFT, TOT_LABEL, base, 0.8, RULE_STRONG);
 
     // The lines add up in public: what the goods came to, then what was taken
-    // off, then what the total was rounded by, then the total itself.
+    // off, then what the total was rounded by.
     let gross = data.total + data.discount - data.rounding;
+    let mut y = base + 18.0;
+    let mut last = y;
 
-    sheet.page.push(
-        line("جمع کل", 9.5, Weight::Regular)
-            .class(Class::Total)
-            .at(y)
-            .right(TOT_LABEL),
+    tot_line(
+        &mut sheet.page,
+        "جمع کل",
+        &fmt_amount(gross),
+        y,
+        9.5,
+        Weight::Regular,
+        INK,
     );
-    sheet.page.push(
-        line(&fmt_amount(gross), 9.5, Weight::Regular)
-            .class(Class::Total)
-            .at(y)
-            .right(TOT_AMOUNT),
-    );
-    y += 15.0;
-
     if data.discount != 0 {
-        sheet.page.push(
-            line("تخفیف", 8.8, Weight::Regular)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y)
-                .right(TOT_LABEL),
-        );
-        sheet.page.push(
-            line(&fmt_amount(-data.discount), 8.8, Weight::Regular)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y)
-                .right(TOT_AMOUNT),
-        );
         y += 13.5;
+        tot_line(
+            &mut sheet.page,
+            "تخفیف",
+            &fmt_amount(-data.discount),
+            y,
+            8.8,
+            Weight::Regular,
+            INK_SOFT,
+        );
+        last = y;
     }
     if data.rounding != 0 {
-        sheet.page.push(
-            line("گرد کردن", 8.8, Weight::Regular)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y)
-                .right(TOT_LABEL),
-        );
-        sheet.page.push(
-            line(&fmt_amount(data.rounding), 8.8, Weight::Regular)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y)
-                .right(TOT_AMOUNT),
-        );
         y += 13.5;
+        tot_line(
+            &mut sheet.page,
+            "گرد کردن",
+            &fmt_amount(data.rounding),
+            y,
+            8.8,
+            Weight::Regular,
+            INK_SOFT,
+        );
+        last = y;
     }
 
-    sheet.page.rule(LEFT, TOT_LABEL, y + 3.0, 0.6, RULE_STRONG);
-    y += 17.0;
-    sheet.page.push(
-        line("مبلغ نهایی", 11.5, Weight::Bold)
-            .class(Class::Total)
-            .at(y)
-            .right(TOT_LABEL),
+    // Air, a divider, air: a new group — the total and what has been paid
+    // against it.
+    y = last + 12.0;
+    sheet.page.rule(LEFT, TOT_LABEL, y, 0.5, RULE_STRONG);
+    y += 20.0;
+    tot_line(
+        &mut sheet.page,
+        "مبلغ نهایی",
+        &fmt_amount(data.total),
+        y,
+        11.5,
+        Weight::Bold,
+        INK,
     );
-    sheet.page.push(
-        line(&fmt_amount(data.total), 11.5, Weight::Bold)
-            .class(Class::Total)
-            .at(y)
-            .right(TOT_AMOUNT),
-    );
-    y += 16.0;
-
+    last = y;
     if data.paid > 0 {
-        sheet.page.push(
-            line("پرداخت شده", 9.0, Weight::Regular)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y)
-                .right(TOT_LABEL),
+        y += 15.0;
+        tot_line(
+            &mut sheet.page,
+            "پرداخت شده",
+            &fmt_amount(data.paid),
+            y,
+            9.0,
+            Weight::Regular,
+            INK_SOFT,
         );
-        sheet.page.push(
-            line(&fmt_amount(data.paid), 9.0, Weight::Regular)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y)
-                .right(TOT_AMOUNT),
-        );
-        y += 14.0;
+        last = y;
     }
 
+    if data.remaining == 0 && data.paid == 0 {
+        sheet.y = last + 6.0;
+        return;
+    }
+
+    // The one number the customer must not miss, after its own break.
+    y = last + 12.0;
+    sheet.page.rule(LEFT, TOT_LABEL, y, 0.5, RULE_STRONG);
+    y += 22.0;
     if data.remaining != 0 {
-        sheet.page.rule(LEFT, TOT_LABEL, y + 3.0, 0.6, RULE_STRONG);
-        y += 21.0;
-        sheet.page.push(
-            line("مانده", 14.0, Weight::Bold)
-                .class(Class::Total)
-                .at(y)
-                .right(TOT_LABEL),
+        tot_line(
+            &mut sheet.page,
+            "مانده",
+            &fmt_amount(data.remaining),
+            y,
+            14.0,
+            Weight::Bold,
+            INK,
         );
-        sheet.page.push(
-            line(&fmt_amount(data.remaining), 14.0, Weight::Bold)
-                .class(Class::Total)
-                .at(y)
-                .right(TOT_AMOUNT - 6.0),
+    } else {
+        tot_line(
+            &mut sheet.page,
+            "تسویه شد",
+            "",
+            y,
+            11.0,
+            Weight::Medium,
+            INK_SOFT,
         );
-        y += 4.0;
-    } else if data.paid > 0 {
-        sheet.page.push(
-            line("تسویه شد", 11.0, Weight::Medium)
-                .class(Class::Total)
-                .shade(INK_SOFT)
-                .at(y + 4.0)
-                .right(TOT_LABEL),
-        );
-        y += 8.0;
     }
-
-    sheet.y = y;
+    sheet.y = y + 4.0;
 }
 
 fn invoice_note(sheet: &mut Sheet, data: &InvoiceData) {
@@ -1012,10 +1075,40 @@ mod tests {
 
     #[test]
     fn the_totals_never_cross_the_right_edge_of_the_left_block() {
-        // A seven digit total still has to fit between the margin and the
-        // amount column.
+        // The biggest number on the sheet still has to fit between the margin
+        // and the amount column.
         let amount = fmt_amount(1_234_567);
         let width = measure(&amount, 14.0, Weight::Bold);
-        assert!(TOT_AMOUNT - 6.0 - width >= LEFT, "{width}");
+        assert!(TOT_AMOUNT - width >= LEFT, "{width}");
+        let label = measure("مبلغ نهایی", 11.5, Weight::Bold);
+        assert!(TOT_LABEL - label >= TOT_AMOUNT, "the label runs into the amount");
+    }
+
+    #[test]
+    fn the_last_line_of_a_statement_follows_the_sign_of_the_balance() {
+        let data = |balance: i64| StatementData {
+            shop: Shop {
+                name: "فروشگاه".to_string(),
+                ..Shop::default()
+            },
+            party_name: "لیلا امینی".to_string(),
+            day: crate::jalali::j2d(1404, 8, 8),
+            balance,
+            rows: vec![StatementRow {
+                day: Some(crate::jalali::j2d(1404, 8, 8)),
+                title: "فاکتور فروش ۱۲".to_string(),
+                amount: 5_175,
+                remaining: Some(5_175),
+            }],
+        };
+        let draw = |balance| {
+            let pages = statement_pages(&data(balance));
+            super::super::svg::render(&pages)
+        };
+        // «طلب شما از ایشان» and «بدهی شما به ایشان» are different words, so
+        // the two sheets cannot be the same drawing.
+        assert_ne!(draw(5_175), draw(-5_175));
+        assert_ne!(draw(5_175), draw(0));
+        assert!(draw(0).contains("</svg>"));
     }
 }

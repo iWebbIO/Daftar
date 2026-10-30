@@ -7,10 +7,13 @@ use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub const KEYS: [(&str, &str); 9] = [
+pub const KEYS: [(&str, &str); 12] = [
     ("shop_name", ""),
     ("shop_phone", ""),
     ("shop_address", ""),
+    ("bank_name", ""),
+    ("card_holder", ""),
+    ("card_number", ""),
     ("invoice_note", ""),
     ("round_step", "0"),
     ("bot_token", ""),
@@ -25,6 +28,9 @@ pub fn load(conn: &Connection) -> Settings {
         shop_name: get("shop_name", ""),
         shop_phone: get("shop_phone", ""),
         shop_address: get("shop_address", ""),
+        bank_name: get("bank_name", ""),
+        card_holder: get("card_holder", ""),
+        card_number: get("card_number", ""),
         invoice_note: get("invoice_note", ""),
         round_step: get("round_step", "0").parse().unwrap_or(0),
         bot_token: get("bot_token", ""),
@@ -39,6 +45,9 @@ pub fn save(conn: &Connection, s: &Settings) -> Res<()> {
     db::put_setting(conn, "shop_name", &s.shop_name)?;
     db::put_setting(conn, "shop_phone", &s.shop_phone)?;
     db::put_setting(conn, "shop_address", &s.shop_address)?;
+    db::put_setting(conn, "bank_name", &s.bank_name)?;
+    db::put_setting(conn, "card_holder", &s.card_holder)?;
+    db::put_setting(conn, "card_number", &s.card_number)?;
     db::put_setting(conn, "invoice_note", &s.invoice_note)?;
     db::put_setting(conn, "round_step", &s.round_step.to_string())?;
     db::put_setting(conn, "bot_token", &s.bot_token)?;

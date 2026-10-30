@@ -12,7 +12,7 @@
 //! is written in font units and never has to think about it.
 
 use super::font::{self, Seg};
-use super::layout::{num, Item, Page, PAGE_H, PAGE_W};
+use super::layout::{num, num_fine, Item, Page, PAGE_H, PAGE_W};
 
 /// Writes every page into one PDF file.
 pub fn render(pages: &[Page]) -> Vec<u8> {
@@ -110,17 +110,20 @@ fn content(page: &Page) -> String {
                     continue;
                 }
                 out.push_str(&format!("{} g\n", num(text.shade)));
-                let s = num(scale);
+                let s = num_fine(scale);
                 for glyph in &text.glyphs {
                     let segs = font::outline(text.weight, glyph.gid);
                     if segs.is_empty() {
                         continue;
                     }
-                    // One transform per glyph: scale, flip y, and put the
-                    // glyph's origin where the layout put it.
+                    // One transform per glyph. PDF counts y upwards and the
+                    // font's outline counts it upwards too, so the transform is
+                    // a plain scale plus a move to the glyph's origin on the
+                    // page; the one place the two y directions meet is the
+                    // `PAGE_H -` here.
                     out.push_str("q\n");
                     out.push_str(&format!(
-                        "{s} 0 0 -{s} {x} {y} cm\n",
+                        "{s} 0 0 {s} {x} {y} cm\n",
                         x = num(text.x + glyph.dx),
                         y = num(PAGE_H - (text.baseline - glyph.dy)),
                     ));

@@ -117,6 +117,37 @@ export default function SettingsScreen() {
           </Btn>
         </Card>
 
+        <div className="label">کارت برای پرداخت</div>
+        <Card>
+          <div className="tiny faint" style={{ marginBottom: 10 }}>
+            روی فاکتور چاپ می‌شود تا مشتری کارت به کارت کند.
+          </div>
+          <Field
+            label="بانک"
+            value={s.bankName}
+            onChange={(v) => patch({ bankName: v })}
+            placeholder="مثلاً بانک ملت"
+            onEnter={() => save({ bankName: s.bankName })}
+          />
+          <Field
+            label="صاحب حساب"
+            value={s.cardHolder}
+            onChange={(v) => patch({ cardHolder: v })}
+            onEnter={() => save({ cardHolder: s.cardHolder })}
+          />
+          <Field
+            label="شماره کارت"
+            value={s.cardNumber}
+            onChange={(v) => patch({ cardNumber: v })}
+            inputMode="numeric"
+            placeholder="6037-9974-1234-5678"
+            onEnter={() => save({ cardNumber: s.cardNumber })}
+          />
+          <Btn wide onClick={() => save({})}>
+            ذخیره
+          </Btn>
+        </Card>
+
         <div className="label">روبـات تلگرام</div>
         <Card>
           <Row

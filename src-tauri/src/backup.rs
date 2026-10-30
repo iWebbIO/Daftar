@@ -412,9 +412,16 @@ mod tests {
 
     impl Drop for Bench {
         fn drop(&mut self) {
-            // Close SQLite first: Windows will not delete an open file.
+            // Close SQLite first: Windows will not delete an open file. The
+            // handle can take a moment to be released, so try a few times —
+            // a leftover temp folder is untidy, never a test failure.
             self.state = None;
-            let _ = std::fs::remove_dir_all(&self.dir);
+            for _ in 0..10 {
+                if std::fs::remove_dir_all(&self.dir).is_ok() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
         }
     }
 

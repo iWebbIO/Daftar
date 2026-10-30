@@ -1,0 +1,333 @@
+/* The order screen. Everything is a column: the lines, the picker, the total,
+   the keypad — and the total is never covered by the keypad. */
+
+.ord-mid {
+  flex: 1;
+  min-height: 0;
+  padding: 8px var(--pad) 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Lines gather at the bottom of the page, next to where the next one is
+   written, the way a notebook fills downwards. */
+.ord-stack {
+  margin-top: auto;
+}
+
+.ord-mid--pad {
+  padding-bottom: calc(24px + var(--safe-b));
+}
+
+/* While a quantity is being typed the page must not move under the finger. */
+.ord-mid.is-typing {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 68%, transparent 100%);
+}
+
+.ord-lines .row__value {
+  font-size: 16.5px;
+}
+
+/* ----------------------------------------------------------------- picker */
+
+.ord-pick {
+  flex: 0 0 auto;
+  padding: 0 var(--pad) 10px;
+}
+
+.ord-pick > .card {
+  margin-bottom: 8px;
+}
+
+.ord-pick .field {
+  margin-bottom: 0;
+}
+
+/* The shortcuts wrap rather than scroll: nothing on this screen is allowed to
+   sit outside the phone's width. */
+.ord-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ord-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 15px;
+  border-radius: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s var(--ease), transform 0.1s var(--ease);
+}
+.ord-chip:active {
+  background: var(--brand-soft);
+  transform: scale(0.97);
+}
+
+/* The two quiet choices beside the total: they are not money, so they are not
+   dressed like money. */
+.ord-chip--soft {
+  min-height: 40px;
+  padding: 0 13px;
+  font-size: 13px;
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.ord-chip--soft.is-on {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* ------------------------------------------------------------------ total */
+
+.ord-total {
+  flex: 0 0 auto;
+  padding: 10px var(--pad) calc(10px + var(--safe-b));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 24px -22px color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+/* While a keypad is open the total steps back: it stays in sight, but the
+   page's white band belongs to the lines. */
+.ord-total.is-compact {
+  background: transparent;
+  border-top: 0;
+  box-shadow: none;
+  padding-top: 8px;
+  padding-bottom: 2px;
+}
+
+.ord-total.is-compact .ord-total__num {
+  font-size: 24px;
+}
+
+.ord-total__main {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.ord-total__label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ord-total__num {
+  position: relative;
+  display: inline-block;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+}
+
+.ord-total__unit {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ord-total__meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.ord-total__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ord-total .btn--lg {
+  margin-top: 8px;
+}
+
+/* The circled total: the same mark he makes with a pen when the number is done. */
+.ord-total.is-final .ord-total__num {
+  color: var(--brand);
+}
+.ord-total.is-final .ord-total__num::after {
+  content: "";
+  position: absolute;
+  inset: -5px -11px -5px -11px;
+  border: 1.6px solid var(--brand);
+  border-radius: 50%;
+  transform: rotate(-1.6deg);
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------------ keypad */
+
+.ord-pad {
+  flex: 0 0 auto;
+  padding: 0 12px calc(10px + var(--safe-b));
+  background: var(--paper);
+}
+
+.ord-pad__shot {
+  padding: 4px 6px 10px;
+}
+
+.ord-pad__who {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ord-pad__nums {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ord-pad__label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ord-pad__num {
+  font-size: 31px;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.15;
+}
+
+.ord-pad__unit {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.ord-pad__side {
+  margin-inline-start: auto;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--positive);
+  white-space: nowrap;
+}
+
+.ord-pad__back {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.ord-pad__back:active {
+  background: var(--surface-2);
+}
+
+/* ------------------------------------------------------------- the money */
+
+.ord-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 22px var(--pad) 12px;
+}
+
+.ord-ask__mid {
+  margin: auto 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ord-ask .segmented {
+  width: 100%;
+  margin: 18px 0 0;
+}
+
+.ord-ask__q {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.ord-ask__num {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin-top: 10px;
+}
+
+.ord-ask__left {
+  font-size: 14.5px;
+  color: var(--negative);
+  margin-top: 2px;
+}
+
+.ord-ask__left.is-clear {
+  color: var(--positive);
+}
+
+/* More money than the paper says: not a mistake, a credit. */
+.ord-ask__over {
+  font-size: 12.5px;
+  color: var(--warn);
+  margin-top: 4px;
+}
+
+.ord-ask .segmented {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------------- one line, opened */
+
+.ord-look {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 14px;
+}
+
+.ord-look__calc {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ord-look__total {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---------------------------------------------------------------- misc */
+
+.ord-change {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.ord-change:active {
+  background: var(--brand-soft);
+}

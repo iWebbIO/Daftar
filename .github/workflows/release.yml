@@ -1,0 +1,161 @@
+name: Release
+
+# Building an installable APK is the whole release: a tag pushes a signed APK to
+# a GitHub Release, and a manual run produces the same APK as a build artifact
+# without publishing anything.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a GitHub Release as well"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Rust with the Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install the NDK and tools the build needs
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.2.12479018" | tail -5
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install the interface dependencies
+        run: npm ci
+
+      - name: The ledger's own tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf libssl-dev
+          cd src-tauri && cargo test
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -e
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No signing secrets set; the APK will be debug-signed."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > src-tauri/gen/android/daftar-release.jks
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          storeFile=$PWD/src-tauri/gen/android/daftar-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEYSTORE_PASSWORD
+          EOF
+
+      - name: Every release needs a higher versionCode than the last one
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = 'src-tauri/tauri.conf.json';
+            const conf = JSON.parse(fs.readFileSync(path, 'utf8'));
+            conf.bundle.android = { ...(conf.bundle.android || {}), versionCode: ${{ github.run_number }} };
+            fs.writeFileSync(path, JSON.stringify(conf, null, 2) + '\n');
+            console.log('versionCode', ${{ github.run_number }});
+          "
+
+      - name: Build the APK
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Name the file clearly
+        id: apk
+        run: |
+          set -e
+          FOUND=$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -1)
+          if [ -z "$FOUND" ]; then
+            echo "::error::No APK was produced"
+            find src-tauri/gen/android/app/build/outputs -maxdepth 3 -type f || true
+            exit 1
+          fi
+          cp "$FOUND" "Daftar-${{ steps.version.outputs.version }}.apk"
+          echo "path=Daftar-${{ steps.version.outputs.version }}.apk" >> "$GITHUB_OUTPUT"
+          ls -lh "Daftar-${{ steps.version.outputs.version }}.apk"
+          # Prove it is signed and installable before anyone downloads it.
+          BUILD_TOOLS=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --print-certs "Daftar-${{ steps.version.outputs.version }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Daftar-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then TAG="v${{ steps.version.outputs.version }}"; fi
+          NOTES="build-notes.md"
+          cat > "$NOTES" <<'EOF'
+          ## دفتر
+
+          فایل APK را روی گوشی اندروید نصب کن. اگر گوشی اجازه نداد، «نصب از منابع ناشناس» را روشن کن.
+
+          نصب تلگرام: توکن ربات را از @BotFather بگیر و در برنامه وارد کن، بعد در ربات Start را بزن.
+          از آن به بعد فاکتور و نسخه پشتیبان به چت خودت می‌آید.
+
+          ---
+
+          Install the APK on an Android phone. The first launch is offline-first: all data stays on the device.
+          EOF
+          gh release create "$TAG" "${{ steps.apk.outputs.path }}" \
+            --title "دفتر ${{ steps.version.outputs.version }}" \
+            --notes-file "$NOTES" \
+            --generate-notes \
+            || gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber

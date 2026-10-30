@@ -1,0 +1,104 @@
+/* یادداشت‌ها — pages, not forms. */
+
+.notes .body {
+  padding-bottom: 10px;
+}
+
+/* The note page itself stretches: the writing area takes whatever room the
+   sheet has, and the save sits at the bottom of it. */
+.notes .sheet--full .sheet__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.nt-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nt-page .field {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.nt-page .field__box {
+  flex: 1;
+  min-height: 0;
+}
+
+.nt-card {
+  padding: 13px 15px 15px;
+}
+
+.nt-card__date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.nt-card__weekday {
+  color: var(--faint);
+}
+
+.nt-card__date svg {
+  margin-inline-start: auto;
+  color: var(--faint);
+}
+
+.nt-card__body {
+  font-size: 15px;
+  line-height: 1.95;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------------- page */
+
+.nt-page__day {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 4px 8px;
+}
+
+.nt-page textarea {
+  min-height: 0;
+  font-size: 17px;
+  line-height: 2;
+}
+
+.nt-submit {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0 4px;
+  background: linear-gradient(to top, var(--paper) 78%, transparent);
+}
+
+/* A Persian hint and a typed number both belong at the right edge. */
+.notes input:placeholder-shown,
+.notes input[inputmode="numeric"] {
+  text-align: right;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.nt-foot {
+  flex: 0 0 auto;
+  padding: 10px var(--pad) 14px;
+  margin-bottom: calc(var(--nav-h) + var(--safe-b));
+  background: linear-gradient(to top, var(--paper) 62%, transparent);
+}

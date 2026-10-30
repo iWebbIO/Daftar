@@ -1,0 +1,89 @@
+/* پول گرفتم: the person, the amount, and what the amount will do. */
+
+.pay-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px var(--pad) 12px;
+}
+
+.pay-quote {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pay-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.pay-amount__label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.pay-amount__num {
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.pay-amount__unit {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* What the balance becomes: the one sentence he checks before he presses. */
+.pay-after {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 6px;
+  min-height: 22px;
+}
+
+.pay-after.is-pos {
+  color: var(--positive);
+}
+
+.pay-after.is-neg {
+  color: var(--negative);
+}
+
+.pay-after.is-clear {
+  color: var(--positive);
+}
+
+.pay-say {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+
+.pay-say__line {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.pay-say__line--credit {
+  color: var(--warn);
+}
+
+.pay-hits {
+  margin-top: 8px;
+}
+
+.pay .segmented {
+  margin-bottom: 4px;
+}

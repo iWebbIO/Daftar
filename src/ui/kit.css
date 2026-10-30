@@ -469,6 +469,9 @@
 .field__box input,
 .field__box textarea {
   flex: 1;
+  /* RTL first: an empty field must put its Persian placeholder on the right,
+     and a number belongs against the same edge as every other number. */
+  text-align: right;
   min-width: 0;
   border: 0;
   outline: 0;

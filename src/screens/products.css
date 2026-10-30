@@ -1,0 +1,146 @@
+/* کالاها — the catalogue and the prices it remembers. */
+
+.products .body {
+  padding-bottom: 10px;
+}
+
+.products .field {
+  margin-bottom: 10px;
+}
+
+/* An empty field should show its Persian hint at the right, and a typed number
+   too, the way everything else on the page is read. */
+.products input {
+  text-align: right;
+}
+
+.pr-legend {
+  margin: 14px 4px 7px;
+}
+
+/* ----------------------------------------------------------------- history */
+
+.pr-now {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 13px 16px 14px;
+  margin-bottom: 12px;
+}
+
+.pr-now__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pr-now__money {
+  margin-top: 1px;
+}
+
+.pr-now__unit {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.pr-change {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 4px 10px;
+}
+
+.pr-change__nums {
+  font-size: 13px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-change__word {
+  font-size: 12px;
+  color: var(--warn);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pr-point {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+}
+
+.pr-point + .pr-point {
+  border-top: 1px solid var(--line);
+}
+
+.pr-point__day {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pr-point__price {
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.pr-quiet {
+  font-size: 13.5px;
+  color: var(--muted);
+  padding: 4px 4px 14px;
+}
+
+.pr-sheet-foot {
+  margin-top: 14px;
+}
+
+/* -------------------------------------------------------------- edit form */
+
+.pr-label {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 4px 7px;
+}
+
+.pr-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.pr-unit {
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background 0.12s var(--ease), border-color 0.12s;
+}
+
+.pr-unit.is-on {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.pr-echo {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: -6px 4px 14px;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.pr-foot {
+  flex: 0 0 auto;
+  padding: 10px var(--pad) 14px;
+  margin-bottom: calc(var(--nav-h) + var(--safe-b));
+  background: linear-gradient(to top, var(--paper) 62%, transparent);
+}

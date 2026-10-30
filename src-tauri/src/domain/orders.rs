@@ -749,11 +749,32 @@ struct FinalArgs {
     r#final: bool,
 }
 
-#[derive(Deserialize)]
-struct SaveArgs {
-    input: DocInput,
+/// What the order screen sends. `types.ts` marks the small fields optional —
+/// a line's `voided`, a document's `discount` — so a screen that never crosses
+/// anything out may leave them out; a missing flag means "no", never a refused
+/// save.
+fn doc_input(args: &Value) -> Res<DocInput> {
+    let mut input = args.get("input").cloned().unwrap_or(Value::Null);
+    if let Value::Object(fields) = &mut input {
+        if let Some(Value::Array(lines)) = fields.get_mut("lines") {
+            for line in lines.iter_mut() {
+                if let Value::Object(line) = line {
+                    line.entry("voided").or_insert(Value::Bool(false));
+                    line.entry("name").or_insert(Value::from(""));
+                    line.entry("unit").or_insert(Value::from(""));
+                    line.entry("qtyMilli").or_insert(Value::from(0));
+                    line.entry("price").or_insert(Value::from(0));
+                }
+            }
+        }
+        fields.entry("discount").or_insert(Value::from(0));
+        fields.entry("roundStep").or_insert(Value::from(0));
+        fields.entry("receivedNow").or_insert(Value::from(0));
+        fields.entry("receivedMethod").or_insert(Value::from("cash"));
+        fields.entry("updatePrices").or_insert(Value::Bool(false));
+    }
+    serde_json::from_value(input).map_err(|_| "ورودی خوانده نشد".to_string())
 }
-
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 struct ListArgs {
@@ -772,9 +793,9 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
             json_of(full(&conn, a.id)?)
         })(),
         "orders.save" => (|| {
-            let a: SaveArgs = read(args)?;
+            let input = doc_input(args)?;
             let conn = ctx.conn()?;
-            json_of(save(&conn, &a.input)?)
+            json_of(save(&conn, &input)?)
         })(),
         "orders.void" => (|| {
             let a: VoidArgs = read(args)?;

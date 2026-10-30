@@ -6,7 +6,7 @@
 //! viewer to get wrong.
 
 use super::font::{self, Seg};
-use super::layout::{num, Item, Page, PAGE_H, PAGE_W};
+use super::layout::{num, num_fine, Item, Page, PAGE_H, PAGE_W};
 
 /// The air between one page and the next when a preview shows several.
 const GAP: f32 = 22.0;
@@ -63,7 +63,7 @@ pub fn render(pages: &[Page]) -> String {
                         out.push_str(&format!(
                             r#"<path transform="matrix({s} 0 0 -{s} {x} {y})" d="{}"/>"#,
                             path_data(&segs),
-                            s = num(scale),
+                            s = num_fine(scale),
                             x = num(text.x + glyph.dx),
                             y = num(text.baseline - glyph.dy),
                         ));

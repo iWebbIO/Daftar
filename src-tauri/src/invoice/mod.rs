@@ -25,14 +25,19 @@ mod font;
 mod layout;
 mod pdf;
 mod svg;
+mod words;
 
 use crate::dto::{Doc, DocLine, Party};
-use font::Weight;
 
 /// A page ready to be sent: the PDF file and the SVG of the same page.
 pub struct Rendered {
     pub pdf_path: PathBuf,
     pub file_name: String,
+    /// The same page as `pdf_path`, for whoever wants to show it rather than
+    /// send it. The interface asks for it through `invoice.svg`; the field is
+    /// here because a caller that has just built a page should not have to
+    /// build it a second time to look at it.
+    #[allow(dead_code)]
     pub svg: String,
 }
 
@@ -330,6 +335,7 @@ fn method_fa(method: &str) -> &'static str {
 mod tests {
     use super::*;
     use crate::db;
+    use font::Weight;
     use layout::{Class, Item};
     use std::sync::Mutex;
 
@@ -355,12 +361,13 @@ mod tests {
     /// Lead should look at.
     fn golden_invoice(conn: &Connection) {
         golden_shop(conn);
-        conn.execute_batch(
+        let day = crate::jalali::j2d(1404, 8, 8);
+        conn.execute_batch(&format!(
             "INSERT INTO party(id, name, phone, kind, opening, created_at, updated_at)
              VALUES(1, 'لیلا امینی', '۰۹۱۲۳۴۵۶۷۸۹', 'customer', 0, 0, 0);
              INSERT INTO doc(id, kind, jyear, number, party_id, day, status, discount, rounding,
                              total, created_at, updated_at)
-             VALUES(1, 'sale', 1404, 12, 1, 2460725, 'open', 0, 0, 5175, 0, 0);
+             VALUES(1, 'sale', 1404, 12, 1, {day}, 'open', 0, 0, 5175, 0, 0);
              INSERT INTO doc_line(id, doc_id, pos, name, qty_milli, unit, price, total, voided)
              VALUES(1, 1, 1, 'گوجه فرنگی', 15000, 'kg', 345, 5175, 0);
              INSERT INTO doc_line(id, doc_id, pos, name, qty_milli, unit, price, total, voided)
@@ -369,9 +376,9 @@ mod tests {
              VALUES(3, 1, 3, 'سیب زمینی', 5000, 'kg', 120, 600, 0);
              UPDATE doc SET total = 6405 WHERE id = 1;
              INSERT INTO payment(id, party_id, direction, amount, day, method, created_at)
-             VALUES(1, 1, 'in', 2000, 2460725, 'cash', 0);
-             INSERT INTO allocation(payment_id, doc_id, amount) VALUES(1, 1, 2000);",
-        )
+             VALUES(1, 1, 'in', 2000, {day}, 'cash', 0);
+             INSERT INTO allocation(payment_id, doc_id, amount) VALUES(1, 1, 2000);"
+        ))
         .unwrap();
     }
 
@@ -471,18 +478,27 @@ mod tests {
         assert!(text.ends_with("%%EOF\n"), "no trailer");
         assert!(text.contains("/MediaBox [0 0 420 595]"), "no MediaBox");
 
-        // The cross-reference table has to point at the objects it claims.
-        let start = text.rfind("startxref").expect("no startxref");
-        let offset: usize = text[start + 9..]
+        // The cross-reference table has to point at the objects it claims. The
+        // file carries a binary marker after the header, so the offsets can
+        // only be trusted against the raw bytes.
+        let start = (0..bytes.len())
+            .rev()
+            .find(|i| bytes[*i..].starts_with(b"startxref"))
+            .expect("no startxref");
+        let offset: usize = std::str::from_utf8(&bytes[start + 9..])
+            .expect("the trailer is not text")
             .lines()
             .map(str::trim)
             .find(|line| !line.is_empty())
             .expect("no startxref offset")
             .parse()
             .expect("startxref is not a number");
-        assert!(text[offset..].starts_with("xref"), "startxref points elsewhere");
+        assert!(
+            bytes[offset..].starts_with(b"xref"),
+            "startxref points at {offset}, not at an xref table"
+        );
 
-        let table = &text[offset..];
+        let table = std::str::from_utf8(&bytes[offset..]).expect("the xref is not text");
         let mut lines = table.lines();
         assert_eq!(lines.next(), Some("xref"));
         let count: usize = lines
@@ -491,6 +507,8 @@ mod tests {
             .and_then(|n| n.parse().ok())
             .expect("no object count");
         assert!(count >= 4, "a page needs four objects");
+        let free = lines.next().expect("no free entry");
+        assert!(free.starts_with("0000000000 65535 f"), "{free:?}");
 
         for id in 1..count {
             let row = lines.next().expect("the xref table is short");
@@ -538,6 +556,184 @@ mod tests {
     }
 
     #[test]
+    fn the_two_operations_the_interface_calls_still_answer() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+        }
+        let ctx = Ctx { state: &state };
+
+        let answer = handle(&ctx, "invoice.svg", &json!({ "docId": 1 }))
+            .expect("invoice.svg is an invoice operation")
+            .expect("the preview renders");
+        let svg = answer.get("svg").and_then(Value::as_str).expect("an svg");
+        assert!(svg.starts_with("<svg"), "{svg:.20}");
+        assert!(svg.ends_with("</svg>"));
+
+        let answer = handle(&ctx, "invoice.preview", &json!({ "docId": 1 }))
+            .expect("invoice.preview is an invoice operation")
+            .expect("the preview renders");
+        let path = answer.get("path").and_then(Value::as_str).expect("a path");
+        assert!(path.ends_with("invoice-1404-0012.pdf"), "{path}");
+        assert!(std::path::Path::new(path).exists());
+
+        assert!(handle(&ctx, "invoice.nonsense", &json!({})).is_none());
+        let err = handle(&ctx, "invoice.svg", &json!({ "docId": 999 }))
+            .expect("invoice.svg is an invoice operation")
+            .unwrap_err();
+        assert_eq!(err, "فاکتور پیدا نشد");
+    }
+
+    #[test]
+    fn a_purchase_names_who_it_was_bought_from() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_shop(&conn);
+            let day = crate::jalali::j2d(1404, 8, 10);
+            conn.execute_batch(&format!(
+                "INSERT INTO party(id, name, kind, opening, created_at, updated_at)
+                 VALUES(3, 'حاج‌آقا رضایی', 'supplier', 0, 0, 0);
+                 INSERT INTO doc(id, kind, jyear, number, party_id, day, status, total,
+                                 created_at, updated_at)
+                 VALUES(7, 'purchase', 1404, 7, 3, {day}, 'open', 1200, 0, 0);
+                 INSERT INTO doc_line(id, doc_id, pos, name, qty_milli, unit, price, total, voided)
+                 VALUES(7, 7, 1, 'کیسه سیب زمینی', 4000, 'bag', 300, 1200, 0);"
+            ))
+            .unwrap();
+        }
+        let ctx = Ctx { state: &state };
+
+        let data = {
+            let conn = ctx.conn().unwrap();
+            load_invoice(&conn, 7).unwrap()
+        };
+        assert_eq!(data.kind, "purchase");
+
+        let pages = layout::invoice_pages(&data);
+        let titles: Vec<&layout::Text> = pages
+            .iter()
+            .flat_map(|page| page.items.iter())
+            .filter_map(|item| match item {
+                Item::Text(text) if text.class == Class::Title => Some(text),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(titles.len(), 1);
+        assert!(titles[0].glyphs.len() > 8, "«خرید از حاج‌آقا» has letters");
+
+        let rendered = render_doc(&ctx, 7).unwrap();
+        assert_eq!(rendered.file_name, "purchase-1404-0007.pdf");
+        std::fs::write(dir.join("purchase.pdf"), pdf::render(&pages)).unwrap();
+        std::fs::write(dir.join("purchase.svg"), svg::render(&pages)).unwrap();
+    }
+
+    #[test]
+    fn a_discount_and_a_rounding_are_printed_between_the_sum_and_the_total() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+            // 6,405 less a 175 discount, then rounded up by 25 to 6,255.
+            conn.execute_batch("UPDATE doc SET discount = 175, rounding = 25 WHERE id = 1")
+                .unwrap();
+        }
+
+        let plain = {
+            let data = {
+                let conn = state.conn().unwrap();
+                load_invoice(&conn, 1).unwrap()
+            };
+            let mut bare = data.clone();
+            bare.discount = 0;
+            bare.rounding = 0;
+            (layout::invoice_pages(&bare), data)
+        };
+        let (bare_pages, data) = plain;
+        let pages = layout::invoice_pages(&data);
+
+        let totals = |set: &[layout::Page]| {
+            set.iter()
+                .flat_map(|page| page.items.iter())
+                .filter(|item| matches!(item, Item::Text(text) if text.class == Class::Total))
+                .count()
+        };
+        // Two extra labelled lines, each with its amount.
+        assert_eq!(totals(&pages), totals(&bare_pages) + 4);
+
+        std::fs::write(dir.join("invoice-discount.pdf"), pdf::render(&pages)).unwrap();
+        std::fs::write(dir.join("invoice-discount.svg"), svg::render(&pages)).unwrap();
+    }
+
+    #[test]
+    fn a_cancelled_line_is_struck_through_not_hidden() {
+        let dir = out_dir();
+        let state = crate::AppState {
+            db: Mutex::new(db::memory()),
+            dirs: crate::Dirs {
+                data: dir.clone(),
+                files: dir.clone(),
+            },
+        };
+        {
+            let conn = state.conn().unwrap();
+            golden_invoice(&conn);
+            // The second line is cancelled, and the total follows the sheet.
+            conn.execute_batch(
+                "UPDATE doc_line SET voided = 1 WHERE id = 2;
+                 UPDATE doc SET total = 5775 WHERE id = 1;",
+            )
+            .unwrap();
+        }
+        let data = {
+            let conn = state.conn().unwrap();
+            load_invoice(&conn, 1).unwrap()
+        };
+        assert_eq!(data.lines.len(), 3);
+
+        let pages = layout::invoice_pages(&data);
+        // The cancelled line keeps its row and its place in the numbering.
+        assert_eq!(baselines(&pages, Class::Row).len(), 3);
+        // A strike is the one thin rule that starts inside the sheet and still
+        // reaches the right margin; the totals dividers stop at the label
+        // column.
+        let strikes = pages
+            .iter()
+            .flat_map(|page| page.items.iter())
+            .filter(|item| {
+                matches!(item, Item::Rule(rule)
+                    if rule.width == 0.5 && rule.x0 > 100.0 && (rule.x1 - 386.0).abs() < 0.01)
+            })
+            .count();
+        assert_eq!(strikes, 1, "one struck-through line, one strike");
+
+        std::fs::write(dir.join("invoice-voided.pdf"), pdf::render(&pages)).unwrap();
+        std::fs::write(dir.join("invoice-voided.svg"), svg::render(&pages)).unwrap();
+    }
+
+    #[test]
     fn a_forty_row_statement_paginates_and_keeps_every_row() {
         let dir = out_dir();
         let state = crate::AppState {
@@ -557,8 +753,9 @@ mod tests {
             .unwrap();
             // Twenty invoices and twenty receipts: forty rows, which is more
             // than one A5 sheet holds.
+            let today = crate::db::today();
             for i in 1..=20 {
-                let day = 2460000 + i * 3;
+                let day = today - (20 - i) * 7;
                 conn.execute(
                     "INSERT INTO doc(id, kind, jyear, number, party_id, day, status, total,
                                      created_at, updated_at)
@@ -596,6 +793,24 @@ mod tests {
         assert_eq!(rendered.file_name, "statement-2.pdf");
         std::fs::write(dir.join("statement.pdf"), pdf::render(&pages)).unwrap();
         std::fs::write(dir.join("statement.svg"), svg::render(&pages)).unwrap();
+    }
+
+    #[test]
+    fn the_thousands_separator_is_the_arabic_one() {
+        // At 160 dpi on paper `٬` and `,` are hard to tell apart, so the test
+        // asks the shaper which glyph each one actually gets.
+        let amount = crate::money::fmt_amount(5_175);
+        assert!(amount.contains('\u{066C}'), "fmt_amount gave {amount}");
+        assert!(!amount.contains(','), "fmt_amount gave {amount}");
+
+        let shaped = font::typeset(&amount, 9.0, Weight::Regular, bidi::Dir::Ltr);
+        let separator = font::typeset("\u{066C}", 9.0, Weight::Regular, bidi::Dir::Ltr);
+        let comma = font::typeset(",", 9.0, Weight::Regular, bidi::Dir::Ltr);
+        assert_eq!(shaped.glyphs[1].gid, separator.glyphs[0].gid);
+        assert_ne!(
+            shaped.glyphs[1].gid, comma.glyphs[0].gid,
+            "the invoice picked up a Latin comma"
+        );
     }
 
     #[test]

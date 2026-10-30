@@ -1,0 +1,176 @@
+/* جمع — a ruled page with a number in every row and a boxed answer under it. */
+
+.sums .body {
+  padding-bottom: 10px;
+}
+
+.sums .field {
+  margin-bottom: 12px;
+}
+
+/* A Persian hint and a typed number both belong at the right edge. */
+.sums input:placeholder-shown,
+.sums input[inputmode="numeric"] {
+  text-align: right;
+}
+
+/* -------------------------------------------------------------------- rows */
+
+.sm-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 14px;
+  text-align: start;
+}
+
+.sm-row + .sm-row::before,
+.sm-row + .sm-add::before,
+.sm-add + .sm-row::before {
+  content: "";
+  position: absolute;
+  inset-inline: 14px;
+  top: 0;
+  height: 1px;
+  background: var(--line);
+}
+
+.sm-row:active {
+  background: var(--surface-2);
+}
+
+.sm-row__pos {
+  flex: 0 0 16px;
+  font-size: 11.5px;
+  color: var(--faint);
+  text-align: center;
+}
+
+.sm-row__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm-row__amount {
+  flex: 0 0 auto;
+  font-size: 16.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.sm-row .is-struck {
+  color: var(--faint);
+}
+
+/* A dashed line is what a new row looks like on paper. */
+.sm-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 14px;
+  color: var(--brand);
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.sm-add:active {
+  background: var(--brand-soft);
+}
+
+.sm-add svg {
+  flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------------- total */
+
+.sm-box {
+  margin: 14px 2px 0;
+  padding: 12px 16px 14px;
+  border: 2px solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand-soft);
+}
+
+.sm-box__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sm-box__num {
+  font-size: 33px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--brand);
+}
+
+.sm-box__unit {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: -3px;
+}
+
+.sm-note {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin: 8px 4px 0;
+}
+
+.sm-hint {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.9;
+  margin: 0 4px 12px;
+}
+
+/* ------------------------------------------------------------------- sheet */
+
+.sm-amount {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 10px 16px 12px;
+  margin-bottom: 12px;
+}
+
+.sm-amount__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sm-amount__num {
+  font-size: 31px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.sm-amount__unit {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: -3px;
+}
+
+.sm-strike {
+  margin-top: 12px;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.sm-foot {
+  flex: 0 0 auto;
+  padding: 10px var(--pad) 14px;
+  margin-bottom: calc(var(--nav-h) + var(--safe-b));
+  background: linear-gradient(to top, var(--paper) 62%, transparent);
+}

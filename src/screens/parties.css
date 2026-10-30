@@ -1,0 +1,72 @@
+/* حساب‌ها: one line of totals, a search, a quiet filter, then the names. */
+
+/* ----------------------------------------------------------------- totals */
+
+/* Not a card: the top line of a page of a ledger. Two numbers, hung on one
+   line, with their words in front of them. */
+.ptot {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.ptot__cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ptot__word {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ptot__num {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.ptot__num--pos {
+  color: var(--positive);
+}
+.ptot__num--neg {
+  color: var(--negative);
+}
+
+.ptot__split {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  flex: 0 0 auto;
+  margin: 1px 0;
+}
+
+/* ------------------------------------------------------------------- words */
+
+/* The word under an amount. It never colours alone: the number is coloured,
+   the word says what the colour means. */
+.pword {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+.pword--pos {
+  color: var(--positive);
+}
+.pword--neg {
+  color: var(--negative);
+}

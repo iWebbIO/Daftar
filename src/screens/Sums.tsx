@@ -1,14 +1,302 @@
-// PLACEHOLDER — being built. Replace this whole file.
-import { Body, Empty, Head, Screen } from "../ui/kit";
+// جمع — the numbered columns from his notebook.
+//
+// A row is a name and an amount. The total under the lines keeps up on its own,
+// struck rows stop counting but stay on the page, and the numbers are typed on
+// the pad, never with a minus sign.
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, errorText } from "../api";
+import { fa, fmtAmount, latin } from "../format";
+import { longDate, today } from "../jalali";
+import { useApp, useNav } from "../nav";
+import {
+  Body,
+  Btn,
+  Card,
+  Field,
+  Head,
+  Icon,
+  Loading,
+  NumPad,
+  Screen,
+  Sheet,
+  Empty,
+} from "../ui/kit";
+import type { SumRow, SumSheet } from "../types";
+import "./sums.css";
+
+interface DraftRow {
+  key: number;
+  id: number;
+  label: string;
+  amount: number;
+  struck: boolean;
+}
+
+interface Draft {
+  id?: number;
+  day: number;
+  title: string;
+  rows: DraftRow[];
+}
+
+let KEY = 1;
+const nextKey = (): number => KEY++;
 
 export default function Sums(props: { id?: number }) {
-  void props;
+  const nav = useNav();
+  const { toast } = useApp();
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ index: number | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      if (props.id) {
+        setDraft(toDraft(await api.sumSheet(props.id)));
+      } else {
+        setDraft({ day: today(), title: "", rows: [] });
+      }
+      setError(null);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }, [props.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const total = useMemo(
+    () => (draft ? draft.rows.reduce((n, r) => (r.struck ? n : n + r.amount), 0) : 0),
+    [draft],
+  );
+  const struck = useMemo(() => (draft ? draft.rows.filter((r) => r.struck).length : 0), [draft]);
+
+  const put = (index: number | null, row: { label: string; amount: number; struck: boolean }) => {
+    setDraft((old) => {
+      if (!old) return old;
+      if (index === null) {
+        return {
+          ...old,
+          rows: [...old.rows, { key: nextKey(), id: 0, ...row }],
+        };
+      }
+      return {
+        ...old,
+        rows: old.rows.map((r, i) => (i === index ? { ...r, ...row } : r)),
+      };
+    });
+    setEditing(null);
+  };
+
+  const save = async () => {
+    if (!draft || busy) return;
+    setBusy(true);
+    try {
+      const saved = await api.saveSumSheet({
+        id: draft.id,
+        day: draft.day,
+        title: draft.title.trim() === "" ? null : draft.title.trim(),
+        rows: draft.rows.map((r, i) => ({
+          id: r.id,
+          sheetId: draft.id ?? 0,
+          pos: i + 1,
+          label: r.label,
+          amount: r.amount,
+          partyId: null,
+          struck: r.struck,
+        })),
+      });
+      setDraft(toDraft(saved));
+      toast("جمع ذخیره شد", "ok");
+      if (nav.canGoBack) nav.back();
+    } catch (e) {
+      toast(errorText(e), "bad");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (error && !draft) {
+    return (
+      <Screen className="sums">
+        <Head title="جمع" onBack={nav.back} />
+        <Body>
+          <Empty title={error} action={<Btn onClick={load}>دوباره</Btn>} />
+        </Body>
+      </Screen>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <Screen className="sums">
+        <Head title="جمع" onBack={nav.back} />
+        <Body>
+          <Loading />
+        </Body>
+      </Screen>
+    );
+  }
+
+  const index = editing ? editing.index : null;
+
   return (
-    <Screen>
-      <Head title="جمع" />
+    <Screen className="sums">
+      <Head
+        title="جمع"
+        onBack={nav.back}
+        sub={longDate(draft.day)}
+      />
+
       <Body>
-        <Empty title="در حال ساخت" />
+        <Field
+          label="عنوان برگه"
+          value={draft.title}
+          onChange={(title) => setDraft({ ...draft, title })}
+          placeholder="مثلاً جمع هفته"
+        />
+
+        {draft.rows.length === 0 && (
+          <div className="sm-hint">هر ردیف یک نام دارد و یک مبلغ. جمعش پایین نوشته می‌شود.</div>
+        )}
+
+        <Card tight>
+          {draft.rows.map((row, i) => (
+            <button key={row.key} className="sm-row" onClick={() => setEditing({ index: i })}>
+              <span className="sm-row__pos num">{fa(i + 1)}</span>
+              <span className={`sm-row__label ${row.struck ? "is-struck" : ""}`}>
+                {row.label === "" ? "بی‌نام" : row.label}
+              </span>
+              <span className={`sm-row__amount num ${row.struck ? "is-struck" : ""}`}>
+                {fmtAmount(row.amount)}
+              </span>
+            </button>
+          ))}
+
+          <button className="sm-add" onClick={() => setEditing({ index: null })}>
+            <Icon name="plus" size={18} />
+            <span>ردیف تازه</span>
+          </button>
+        </Card>
+
+        {draft.rows.length > 0 && (
+          <>
+            <div className="sm-box">
+              <div className="sm-box__label">جمع</div>
+              <div className="sm-box__num num">{fmtAmount(total)}</div>
+              <div className="sm-box__unit">تومان</div>
+            </div>
+            {struck > 0 && (
+              <div className="sm-note">{fa(struck)} ردیف خط خورده، در جمع نیست.</div>
+            )}
+          </>
+        )}
       </Body>
+
+      <div className="sm-foot">
+        <Btn wide busy={busy} disabled={draft.rows.length === 0} onClick={() => void save()}>
+          ذخیره
+        </Btn>
+      </div>
+
+      {editing && (
+        <RowSheet
+          initial={index === null ? null : draft.rows[index] ?? null}
+          onClose={() => setEditing(null)}
+          onPut={(row) => put(index, row)}
+        />
+      )}
     </Screen>
   );
+}
+
+function RowSheet({
+  initial,
+  onClose,
+  onPut,
+}: {
+  initial: DraftRow | null;
+  onClose: () => void;
+  onPut: (row: { label: string; amount: number; struck: boolean }) => void;
+}) {
+  const [label, setLabel] = useState(initial ? initial.label : "");
+  const [typed, setTyped] = useState(initial && initial.amount > 0 ? String(initial.amount) : "");
+  const amount = typed === "" ? 0 : Number(typed);
+  const struck = initial ? initial.struck : false;
+  const existing = initial !== null;
+
+  const key = (k: string) => {
+    if (k === "⌫") {
+      setTyped((t) => t.slice(0, -1));
+      return;
+    }
+    if (k === "٫") return; // تومان is whole; the decimal key has nothing to write here.
+    setTyped((t) => {
+      const next = (t + latin(k)).replace(/^0+(?=\d)/, "");
+      return next.length > 12 ? t : next;
+    });
+  };
+
+  const commit = (turn: boolean) => {
+    if (!existing) {
+      if (label.trim() === "" && amount <= 0) return;
+      onPut({ label: label.trim(), amount, struck: false });
+      return;
+    }
+    onPut({ label: label.trim(), amount, struck: turn ? !struck : struck });
+  };
+
+  return (
+    <Sheet open onClose={onClose} title={existing ? "این ردیف" : "ردیف تازه"}>
+      <Field
+        label="چه چیزی؟"
+        value={label}
+        onChange={setLabel}
+        placeholder="مثلاً شنبه یا کرایه"
+        onEnter={() => commit(false)}
+      />
+
+      <div className="sm-amount">
+        <div className="sm-amount__label">مبلغ</div>
+        <div className="sm-amount__num num">{fmtAmount(amount)}</div>
+        <div className="sm-amount__unit">تومان</div>
+      </div>
+
+      <NumPad
+        onKey={key}
+        onSubmit={() => commit(false)}
+        submitLabel={existing ? "ثبت" : "افزودن"}
+      />
+
+      {existing && (
+        <div className="sm-strike">
+          <Btn wide variant={struck ? "ghost" : "quiet"} onClick={() => commit(true)}>
+            {struck ? "به جمع برگردان" : "از جمع خط بزن"}
+          </Btn>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function toDraft(sheet: SumSheet): Draft {
+  return {
+    id: sheet.id,
+    day: sheet.day,
+    title: sheet.title ?? "",
+    rows: sheet.rows.map(toDraftRow),
+  };
+}
+
+function toDraftRow(row: SumRow): DraftRow {
+  return {
+    key: nextKey(),
+    id: row.id,
+    label: row.label,
+    amount: row.amount,
+    struck: row.struck,
+  };
 }

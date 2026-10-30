@@ -61,12 +61,6 @@ pub struct Typeset {
     pub width: f32,
 }
 
-impl Typeset {
-    pub fn is_empty(&self) -> bool {
-        self.glyphs.is_empty()
-    }
-}
-
 /// Shapes `text` at `size` points and returns the glyphs in **visual** order:
 /// left to right, whatever direction the run itself runs in.
 ///

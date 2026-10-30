@@ -29,6 +29,7 @@ import type {
   ReportDays,
   SearchHit,
   Settings,
+  SumRowInput,
   SumSheet,
   Task,
   TaskRow,
@@ -110,15 +111,17 @@ export const api = {
   tasks: (opts: { includeDone?: boolean } = {}) => call<TaskRow[]>("tasks.list", opts),
   saveTask: (task: Partial<Task> & { text: string }) => call<Task>("tasks.save", { task }),
   toggleTask: (id: number) => call<Task>("tasks.toggle", { id }),
+  removeTask: (id: number) => call<boolean>("tasks.remove", { id }),
 
   // ---- notes -------------------------------------------------------------
   notes: (opts: { q?: string; limit?: number } = {}) => call<Note[]>("notes.list", opts),
   saveNote: (note: Partial<Note> & { body: string }) => call<Note>("notes.save", { note }),
+  removeNote: (id: number) => call<boolean>("notes.remove", { id }),
 
   // ---- sum sheets --------------------------------------------------------
   sums: () => call<SumSheet[]>("sums.list", {}),
   sumSheet: (id: number) => call<SumSheet>("sums.get", { id }),
-  saveSumSheet: (sheet: Partial<SumSheet> & { rows: SumSheet["rows"] }) =>
+  saveSumSheet: (sheet: { id?: number; day?: number; title?: string | null; rows: SumRowInput[] }) =>
     call<SumSheet>("sums.save", { sheet }),
 
   // ---- reports -----------------------------------------------------------
