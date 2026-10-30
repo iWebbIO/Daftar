@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import { fmtAmount } from "../format";
-import { longDate, weekdayName } from "../jalali";
+import { longDate, relativeDay, weekdayName } from "../jalali";
 import { useApp, useNav } from "../nav";
 import { Body, Btn, Card, Empty, Head, Icon, Loading, Money, Pill, Row, Screen } from "../ui/kit";
 import type { TodayView } from "../types";
@@ -175,16 +175,29 @@ export default function Today() {
               <span>چک‌ها</span>
             </div>
             <Card tight>
-              {view.cheques.map(({ cheque, partyName }) => (
-                <Row
-                  key={cheque.id}
-                  title={partyName}
-                  sub={`${cheque.bank ?? "چک"} · ${longDate(cheque.dueDay)}`}
-                  value={fmtAmount(cheque.amount)}
-                  tone={cheque.direction === "in" ? "pos" : "neg"}
-                  note={cheque.direction === "in" ? "دریافتنی" : "پرداختنی"}
-                />
-              ))}
+              {view.cheques.map(({ cheque, partyName }) => {
+                // A cheque whose day has passed is money he has forgotten to
+                // collect; on the home screen it must not read like next week's.
+                const late = cheque.dueDay < view.day;
+                return (
+                  <Row
+                    key={cheque.id}
+                    title={partyName}
+                    sub={`${cheque.bank ?? "چک"} · ${late ? relativeDay(cheque.dueDay) : longDate(cheque.dueDay)}`}
+                    value={fmtAmount(cheque.amount)}
+                    tone={cheque.direction === "in" ? "pos" : "neg"}
+                    note={
+                      late ? (
+                        <Pill tone="warn">گذشته</Pill>
+                      ) : cheque.direction === "in" ? (
+                        "دریافتنی"
+                      ) : (
+                        "پرداختنی"
+                      )
+                    }
+                  />
+                );
+              })}
             </Card>
           </>
         )}
