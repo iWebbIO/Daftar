@@ -45,6 +45,9 @@ const ROUTES = names.length
       "settings",
       "more",
       "calc",
+      // a record that does not exist must degrade in Persian, never blank
+      "party:999",
+      "invoice:999",
     ];
 
 const base = process.env.BASE_URL ?? "http://127.0.0.1:5183/";

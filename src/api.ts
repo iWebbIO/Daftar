@@ -51,10 +51,25 @@ async function call<T>(op: string, args: unknown = {}): Promise<T> {
   return (await invoke<T>("call", { op, args })) as T;
 }
 
-/** Errors arrive already written in Persian, ready to show. */
+/**
+ * Errors arrive already written in Persian from Rust, ready to show.
+ *
+ * Anything that is *not* Persian is a bug or a browser error, and a shopkeeper
+ * must never see one: falling through to the same sentence the app uses for an
+ * unknown failure beats showing him «Cannot read properties of undefined». The
+ * original goes to the console for whoever is debugging.
+ */
 export function errorText(e: unknown): string {
-  if (typeof e === "string") return e;
-  if (e && typeof e === "object" && "message" in e) return String((e as Error).message);
+  const guard = (detail: string): string => {
+    console.warn(detail);
+    return "مشکلی پیش آمد";
+  };
+  const persian = /[\u0600-\u06FF]/;
+  if (typeof e === "string") return persian.test(e) ? e : guard(e);
+  if (e && typeof e === "object" && "message" in e) {
+    const message = String((e as Error).message);
+    return persian.test(message) ? message : guard(message);
+  }
   return "مشکلی پیش آمد";
 }
 

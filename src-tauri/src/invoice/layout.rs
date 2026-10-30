@@ -1136,18 +1136,34 @@ pub struct StatementRow {
     pub title: String,
     pub amount: i64,
     pub remaining: Option<i64>,
+    /// A document that was cancelled after it was written. It stays on the
+    /// statement, struck through, the same way the invoice keeps it.
+    pub voided: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct StatementData {
     pub shop: Shop,
     pub party_name: String,
-    /// Today, in Jalali, printed at the top of the sheet.
+    /// The day the statement was made — not the day it happens to be printed
+    /// out of the folder, which is the same thing because the file is written
+    /// when it is asked for.
     pub day: i64,
     /// Positive: the party owes the shop.
     pub balance: i64,
     /// Newest first.
     pub rows: Vec<StatementRow>,
+}
+
+/// Who owes whom, said to the customer who is reading the page. The invoice is
+/// the shopkeeper's paper; the statement is the customer's, so it is written in
+/// the first person and addresses him directly.
+pub fn owed_phrase(balance: i64) -> &'static str {
+    match balance {
+        b if b > 0 => "طلب ما از شماست",
+        b if b < 0 => "طلب شما از ماست",
+        _ => "حساب تسویه است",
+    }
 }
 
 pub fn statement_pages(data: &StatementData) -> Vec<Page> {
@@ -1160,8 +1176,11 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
             .at(96.0)
             .right(RIGHT),
     );
+    // The date is labelled, so nobody has to guess whether it is the date of
+    // the statement or of the last purchase on it.
+    let dated = format!("تاریخ: {}", jalali::long(data.day));
     sheet.page.push(
-        line(&jalali::long(data.day), 9.0, Weight::Regular)
+        line(&dated, 9.0, Weight::Regular)
             .class(Class::Meta)
             .shade(INK_SOFT)
             .at(96.0)
@@ -1184,7 +1203,7 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
 
     if data.rows.is_empty() {
         sheet.page.push(
-            line("حرکتی ثبت نشده است", 9.0, Weight::Regular)
+            line("هنوز حسابی ثبت نشده است", 9.0, Weight::Regular)
                 .class(Class::Row)
                 .shade(INK_FAINT)
                 .at(sheet.y)
@@ -1199,12 +1218,13 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
             statement_continuation(&mut sheet, data, "ادامه");
         }
         let y = sheet.y;
+        let ink = if item.voided { 0.46 } else { INK };
 
         let date = item.day.map(jalali::short).unwrap_or_default();
         sheet.page.push(
             line(&date, 8.4, Weight::Regular)
                 .class(Class::Row)
-                .shade(INK_FAINT)
+                .shade(if item.voided { 0.46 } else { INK_FAINT })
                 .at(y)
                 .right(S_DATE),
         );
@@ -1212,27 +1232,42 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
         sheet.page.push(
             line(&title, 8.8, Weight::Regular)
                 .class(Class::Row)
-                .shade(INK)
+                .shade(ink)
                 .at(y)
                 .right(S_TITLE),
         );
-        let shown = amount(item.amount, &data.shop.currency);
-        sheet.page.push(
-            money(&shown, 8.8, Weight::Regular)
-                .class(Class::Row)
-                .shade(INK)
-                .at(y)
-                .right(S_AMOUNT),
-        );
-        if let Some(rest) = item.remaining {
-            let rest = amount(rest, &data.shop.currency);
+
+        if item.voided {
+            // A cancelled invoice was still sent to this customer once, so it
+            // is shown struck through rather than quietly dropped — with no
+            // figure, because a crossed-out invoice adds nothing to anything.
             sheet.page.push(
-                money(&rest, 8.8, Weight::Regular)
+                line("خط خورده", 8.4, Weight::Regular)
                     .class(Class::Row)
-                    .shade(INK_SOFT)
+                    .shade(0.46)
                     .at(y)
-                    .right(S_REST),
+                    .right(S_AMOUNT),
             );
+            sheet.page.rule(S_REST, S_DATE, y - 3.0, 0.5, 0.46);
+        } else {
+            let shown = amount(item.amount, &data.shop.currency);
+            sheet.page.push(
+                money(&shown, 8.8, Weight::Regular)
+                    .class(Class::Row)
+                    .shade(INK)
+                    .at(y)
+                    .right(S_AMOUNT),
+            );
+            if let Some(rest) = item.remaining {
+                let rest = amount(rest, &data.shop.currency);
+                sheet.page.push(
+                    money(&rest, 8.8, Weight::Regular)
+                        .class(Class::Row)
+                        .shade(INK_SOFT)
+                        .at(y)
+                        .right(S_REST),
+                );
+            }
         }
 
         sheet.page.rule(LEFT, RIGHT, y + 6.0, 0.3, 0.90);
@@ -1286,36 +1321,50 @@ fn statement_continuation(sheet: &mut Sheet, data: &StatementData, what: &str) {
     sheet.y = 99.0;
 }
 
+/// The ask. It sits at the foot of the last page — so a statement of one row
+/// and a statement of forty end the same way — and it is the largest type on
+/// the sheet, because it is the only line the customer has to act on.
 fn statement_balance(sheet: &mut Sheet, data: &StatementData) {
-    if !sheet.has_room(78.0) {
+    /// From the top rule to the last baseline, in points.
+    const BLOCK: f32 = 58.0;
+
+    if !sheet.has_room(16.0 + BLOCK) {
         sheet.page_break();
         statement_continuation(sheet, data, "مانده");
     }
-    let base = sheet.y + 12.0;
+    // After a full page of rows it follows them; after a short one it slides
+    // down to the same place at the foot.
+    let base = (sheet.y + 16.0).max(BOTTOM - BLOCK);
     sheet.page.rule(LEFT, RIGHT, base, 0.9, RULE_STRONG);
 
-    let balance = fmt_currency(data.balance.abs(), &data.shop.currency);
-    let line_text = format!("مانده حساب: {balance}");
+    let owed = fmt_currency(data.balance.abs(), &data.shop.currency);
     sheet.page.push(
-        line(&line_text, 12.5, Weight::Bold)
+        line(&format!("مانده حساب: {owed}"), 16.0, Weight::Bold)
             .class(Class::Total)
-            .at(base + 24.0)
+            .at(base + 26.0)
             .right(RIGHT),
     );
-
-    let (side, shade) = match data.balance {
-        b if b > 0 => ("طلب شما از ایشان", INK),
-        b if b < 0 => ("بدهی شما به ایشان", INK),
-        _ => ("حساب تسویه است", INK_SOFT),
-    };
     sheet.page.push(
-        line(side, 9.0, Weight::Regular)
+        line(owed_phrase(data.balance), 11.0, Weight::Medium)
             .class(Class::Total)
-            .shade(shade)
-            .at(base + 40.0)
+            .shade(if data.balance == 0 { INK_SOFT } else { INK })
+            .at(base + 44.0)
             .right(RIGHT),
     );
-    sheet.y = base + 40.0;
+    // مبلغ به حروف, as on the invoice: the figure said out loud, in whichever
+    // unit the shop prints in.
+    sheet.page.push(
+        line(
+            &words::currency(data.balance.abs(), &data.shop.currency),
+            8.6,
+            Weight::Regular,
+        )
+        .class(Class::Total)
+        .shade(0.30)
+        .at(base + 58.0)
+        .right(RIGHT),
+    );
+    sheet.y = base + 58.0;
 }
 
 // ---------------------------------------------------------------------------

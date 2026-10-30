@@ -458,7 +458,8 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
     }
     case "parties.book": {
       const id = Number(a.id);
-      const p = s.parties.find((x) => x.id === id)!;
+      const p = s.parties.find((x) => x.id === id);
+      if (!p) throw "طرف حساب پیدا نشد";
       const docs = s.docs.filter((d) => d.partyId === id && d.status !== "void");
       const payments = s.payments.filter((x) => x.partyId === id && !x.voided);
       const items = [
@@ -545,7 +546,8 @@ export async function mockCall(op: string, args: Record<string, unknown>): Promi
 
     case "orders.get": {
       const id = Number(a.id);
-      const doc = s.docs.find((d) => d.id === id)!;
+      const doc = s.docs.find((d) => d.id === id);
+      if (!doc) throw "فاکتور پیدا نشد";
       return {
         doc,
         party: s.parties.find((p) => p.id === doc.partyId)!,
