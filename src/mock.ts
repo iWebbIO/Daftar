@@ -271,6 +271,7 @@ function seed(): Store {
       roundStep: 0,
       botToken: "",
       chatId: "",
+      currency: "toman",
       backupHour: 21,
       lastBackupAt: now() - 1000 * 60 * 60 * 20,
       theme: "light",

@@ -138,6 +138,14 @@ pub fn toman(n: i64) -> String {
     format!("{} تومان", words(n))
 }
 
+/// The line that goes under the total: `۱٬۸۶۲٬۰۰۰` → «یک میلیون و هشتصد و
+/// شصت و دو هزار تومان». The ledger is in toman; a shop that prints in rial
+/// gets the same amount at ten times the figure, with the other unit word.
+pub fn currency(toman: i64, currency: &str) -> String {
+    let printed = toman.saturating_mul(crate::money::scale(currency));
+    format!("{} {}", words(printed), crate::money::unit(currency))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,5 +201,17 @@ mod tests {
     fn a_debt_is_said_as_a_negative() {
         assert_eq!(words(-2_500), "منفی دو هزار و پانصد");
         assert_eq!(toman(1_862_000), "یک میلیون و هشتصد و شصت و دو هزار تومان");
+    }
+
+    #[test]
+    fn the_same_amount_is_ten_times_the_figure_in_rial() {
+        assert_eq!(currency(1_862_000, "toman"), "یک میلیون و هشتصد و شصت و دو هزار تومان");
+        assert_eq!(
+            currency(1_862_000, "rial"),
+            "هجده میلیون و ششصد و بیست هزار ریال"
+        );
+        assert_eq!(currency(0, "rial"), "صفر ریال");
+        assert_eq!(currency(6_405, "toman"), "شش هزار و چهارصد و پنج تومان");
+        assert_eq!(currency(6_405, "rial"), "شصت و چهار هزار و پنجاه ریال");
     }
 }

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, errorText, inApp } from "../api";
 import { fmtAmount } from "../format";
 import { dayOf, longDate } from "../jalali";
+import { setCurrency } from "../format";
 import { useApp, useNav } from "../nav";
 import {
   Body,
@@ -119,9 +120,6 @@ export default function SettingsScreen() {
 
         <div className="label">کارت برای پرداخت</div>
         <Card>
-          <div className="tiny faint" style={{ marginBottom: 10 }}>
-            روی فاکتور چاپ می‌شود تا مشتری کارت به کارت کند.
-          </div>
           <Field
             label="بانک"
             value={s.bankName}
@@ -178,6 +176,24 @@ export default function SettingsScreen() {
                 {backup.message} · {fmtAmount(Math.round(backup.size / 1024))} کیلوبایت
               </div>
             )}
+          </div>
+        </Card>
+
+        <div className="label">واحد پول</div>
+        <Card>
+          <div style={{ padding: "12px 14px" }}>
+            <Segmented
+              options={[
+                { value: "toman", label: "تومان" },
+                { value: "rial", label: "ریال" },
+              ]}
+              value={s.currency}
+              onChange={(v) => {
+                patch({ currency: v });
+                setCurrency(v);
+                void save({ currency: v });
+              }}
+            />
           </div>
         </Card>
 

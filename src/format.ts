@@ -8,6 +8,26 @@ export const DECIMAL = "٫";
 
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
+/**
+ * The shop writes its papers in one unit or the other. This is a display
+ * choice only: everything is stored in toman, and rial is the same money
+ * counted ten to the toman — so the ledger never has two truths.
+ */
+let CURRENCY: "toman" | "rial" = "toman";
+
+export function setCurrency(currency: string): void {
+  CURRENCY = currency === "rial" ? "rial" : "toman";
+}
+
+export function currencyLabel(): string {
+  return CURRENCY === "rial" ? "ریال" : "تومان";
+}
+
+/** 1 in the ledger is 10 on a rial invoice. */
+export function currencyScale(): number {
+  return CURRENCY === "rial" ? 10 : 1;
+}
+
 /** Any digit, Persian, Arabic-Indic or Latin, becomes Persian. */
 export function fa(input: string | number): string {
   return String(input)
@@ -22,10 +42,11 @@ export function latin(input: string): string {
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
 }
 
-/** `۳۴۵٬۰۰۰` */
+/** `۳۴۵٬۰۰۰` — in the unit the shop has chosen. */
 export function fmtAmount(n: number): string {
-  const negative = n < 0;
-  const digits = Math.abs(Math.round(n)).toString();
+  const value = Math.round(n) * currencyScale();
+  const negative = value < 0;
+  const digits = Math.abs(value).toString();
   let out = "";
   for (let i = 0; i < digits.length; i += 1) {
     if (i > 0 && (digits.length - i) % 3 === 0) out += THOUSANDS;
@@ -36,7 +57,7 @@ export function fmtAmount(n: number): string {
 
 /** `۳۴۵٬۰۰۰ تومان` */
 export function fmtToman(n: number): string {
-  return `${fmtAmount(n)} تومان`;
+  return `${fmtAmount(n)} ${currencyLabel()}`;
 }
 
 /** `۵٬۱۷۵` without the unit, for tables where the unit is in the header. */
@@ -63,7 +84,9 @@ export function parseAmount(input: string): number | null {
     scale = 1000;
   }
   if (!/^-?\d+$/.test(text)) return null;
-  return Number(text) * scale;
+  const typed = Number(text) * scale;
+  // Typed in rial means a tenth of that in the ledger.
+  return Math.round(typed / currencyScale());
 }
 
 /** Parses a quantity into thousandths. `۲٫۵` and `2.5` both mean 2500. */

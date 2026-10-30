@@ -410,6 +410,8 @@ pub struct Settings {
     pub round_step: i64,
     pub bot_token: String,
     pub chat_id: String,
+    /// تومن or ریال — a display choice; the ledger is always in toman.
+    pub currency: String,
     pub backup_hour: i64,
     pub last_backup_at: Option<i64>,
     pub theme: String,

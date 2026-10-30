@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub const KEYS: [(&str, &str); 12] = [
+pub const KEYS: [(&str, &str); 13] = [
     ("shop_name", ""),
     ("shop_phone", ""),
     ("shop_address", ""),
@@ -18,6 +18,7 @@ pub const KEYS: [(&str, &str); 12] = [
     ("round_step", "0"),
     ("bot_token", ""),
     ("chat_id", ""),
+    ("currency", "toman"),
     ("backup_hour", "21"),
     ("theme", "light"),
 ];
@@ -35,6 +36,7 @@ pub fn load(conn: &Connection) -> Settings {
         round_step: get("round_step", "0").parse().unwrap_or(0),
         bot_token: get("bot_token", ""),
         chat_id: get("chat_id", ""),
+        currency: get("currency", "toman"),
         backup_hour: get("backup_hour", "21").parse().unwrap_or(21),
         last_backup_at: get("last_backup_at", "").parse().ok(),
         theme: get("theme", "light"),
@@ -52,6 +54,7 @@ pub fn save(conn: &Connection, s: &Settings) -> Res<()> {
     db::put_setting(conn, "round_step", &s.round_step.to_string())?;
     db::put_setting(conn, "bot_token", &s.bot_token)?;
     db::put_setting(conn, "chat_id", &s.chat_id)?;
+    db::put_setting(conn, "currency", &s.currency)?;
     db::put_setting(conn, "backup_hour", &s.backup_hour.to_string())?;
     db::put_setting(conn, "theme", &s.theme)?;
     Ok(())

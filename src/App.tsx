@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "./api";
+import { setCurrency } from "./format";
 import { AppCtx, type Nav, type Route, hashToRoute, routeToHash } from "./nav";
 import { Icon } from "./ui/kit";
 import type { Settings } from "./types";
@@ -57,6 +58,7 @@ export default function App() {
       const s = await api.settings();
       setSettings(s);
       document.documentElement.dataset.theme = s.theme === "dark" ? "dark" : "light";
+      setCurrency(s.currency);
     } catch (e) {
       setSettings((old) => old);
       console.warn(errorText(e));

@@ -123,6 +123,7 @@ fn shop(conn: &Connection) -> layout::Shop {
         bank: s.bank_name,
         card_holder: s.card_holder,
         card_number: s.card_number,
+        currency: s.currency,
     }
 }
 

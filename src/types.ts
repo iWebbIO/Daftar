@@ -267,6 +267,7 @@ export interface Settings {
   roundStep: number;
   botToken: string;
   chatId: string;
+  currency: "toman" | "rial";
   backupHour: number;
   lastBackupAt: number | null;
   theme: "light" | "dark";

@@ -139,6 +139,30 @@ pub fn round_to(amount: i64, step: i64) -> i64 {
     ((amount + half).div_euclid(step)) * step
 }
 
+/// Amounts are stored in toman. A shop that writes its invoices in rial is a
+/// display choice, not a second ledger: one toman is ten rial, so the only thing
+/// that changes is the number on the paper.
+pub fn scale(currency: &str) -> i64 {
+    if currency == "rial" {
+        10
+    } else {
+        1
+    }
+}
+
+pub fn unit(currency: &str) -> &'static str {
+    if currency == "rial" {
+        "ریال"
+    } else {
+        "تومان"
+    }
+}
+
+/// `۳۴۵٬۰۰۰ تومان`, in whichever unit the shop uses.
+pub fn fmt_currency(toman: i64, currency: &str) -> String {
+    format!("{} {}", fmt_amount(toman * scale(currency)), unit(currency))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -16,7 +16,7 @@ use super::bidi::Dir;
 use super::font::{self, Glyph, Weight};
 use super::words;
 use crate::jalali;
-use crate::money::{fa_digits, fmt_amount, fmt_qty};
+use crate::money::{self, fa_digits, fmt_amount, fmt_currency, fmt_qty};
 
 pub const PAGE_W: f32 = 420.0;
 pub const PAGE_H: f32 = 595.0;
@@ -372,6 +372,14 @@ pub fn measure(text: &str, size: f32, weight: Weight) -> f32 {
     typeset_line(text, size, weight, false).width
 }
 
+/// An amount as the shop prints it: moved into the shop's currency and written
+/// in Persian digits, **without** the unit — a فاکتور shows bare numbers in its
+/// table and in its totals, and says the unit once, in the words line beneath.
+/// The ledger is always in toman; `currency` only scales what is printed.
+pub(super) fn amount(toman: i64, currency: &str) -> String {
+    fmt_amount(toman.saturating_mul(money::scale(currency)))
+}
+
 /// The width a column of money will take, in tabular figures.
 pub fn measure_money(text: &str, size: f32, weight: Weight) -> f32 {
     typeset_line(text, size, weight, true).width
@@ -441,6 +449,9 @@ pub struct Shop {
     pub bank: String,
     pub card_holder: String,
     pub card_number: String,
+    /// `toman` or `rial`. The ledger is in toman whatever this says; it only
+    /// decides how an amount is written on paper.
+    pub currency: String,
 }
 
 /// A page under construction, with the pen moving down it.
@@ -795,7 +806,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
                 .right(grid.unit),
         );
 
-        let price = fit_money(&fmt_amount(item.price), 8.5, Weight::Regular, 52.0);
+        let price = fit_money(&amount(item.price, &data.shop.currency), 8.5, Weight::Regular, 52.0);
         sheet.page.push(
             money(&price, 8.5, Weight::Regular)
                 .class(Class::Row)
@@ -808,7 +819,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
             let discount = item.discount();
             if discount > 0 {
                 sheet.page.push(
-                    money(&fmt_amount(discount), 8.5, Weight::Regular)
+                    money(&amount(discount, &data.shop.currency), 8.5, Weight::Regular)
                         .class(Class::Row)
                         .shade(ink)
                         .at(y)
@@ -822,7 +833,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         let total = if item.voided {
             "خط خورده".to_string()
         } else {
-            fmt_amount(item.total)
+            amount(item.total, &data.shop.currency)
         };
         let total = fit_money(&total, 8.5, Weight::Regular, 62.0);
         sheet.page.push(
@@ -896,7 +907,7 @@ fn invoice_money(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
 
     // مبلغ به حروف — the total said in words, the way every printed Iranian
     // فاکتور closes its figures.
-    let said = words::toman(data.total);
+    let said = words::currency(data.total, &data.shop.currency);
     let text = format!("مبلغ به حروف: {said}");
     sheet.page.push(
         line(&fit(&text, 8.6, Weight::Regular, RIGHT - LEFT), 8.6, Weight::Regular)
@@ -922,7 +933,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
     tot_line(
         &mut sheet.page,
         "جمع آیتم‌ها",
-        &fmt_amount(items),
+        &amount(items, &data.shop.currency),
         y,
         9.5,
         Weight::Regular,
@@ -939,7 +950,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
         tot_line(
             &mut sheet.page,
             &label,
-            &fmt_amount(-data.discount),
+            &amount(-data.discount, &data.shop.currency),
             y,
             8.8,
             Weight::Regular,
@@ -952,7 +963,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
         tot_line(
             &mut sheet.page,
             "گرد کردن",
-            &fmt_amount(data.rounding),
+            &amount(data.rounding, &data.shop.currency),
             y,
             8.8,
             Weight::Regular,
@@ -968,7 +979,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
     tot_line(
         &mut sheet.page,
         "جمع کل",
-        &fmt_amount(data.total),
+        &amount(data.total, &data.shop.currency),
         y,
         12.5,
         Weight::Bold,
@@ -980,7 +991,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
         tot_line(
             &mut sheet.page,
             "پرداخت شده",
-            &fmt_amount(data.paid),
+            &amount(data.paid, &data.shop.currency),
             y,
             9.0,
             Weight::Regular,
@@ -1001,7 +1012,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
         tot_line(
             &mut sheet.page,
             "مانده",
-            &fmt_amount(data.remaining),
+            &amount(data.remaining, &data.shop.currency),
             y,
             14.0,
             Weight::Bold,
@@ -1205,16 +1216,16 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
                 .at(y)
                 .right(S_TITLE),
         );
-        let amount = fmt_amount(item.amount);
+        let shown = amount(item.amount, &data.shop.currency);
         sheet.page.push(
-            money(&amount, 8.8, Weight::Regular)
+            money(&shown, 8.8, Weight::Regular)
                 .class(Class::Row)
                 .shade(INK)
                 .at(y)
                 .right(S_AMOUNT),
         );
         if let Some(rest) = item.remaining {
-            let rest = fmt_amount(rest);
+            let rest = amount(rest, &data.shop.currency);
             sheet.page.push(
                 money(&rest, 8.8, Weight::Regular)
                     .class(Class::Row)
@@ -1283,10 +1294,10 @@ fn statement_balance(sheet: &mut Sheet, data: &StatementData) {
     let base = sheet.y + 12.0;
     sheet.page.rule(LEFT, RIGHT, base, 0.9, RULE_STRONG);
 
-    let amount = format!("{} تومان", fmt_amount(data.balance.abs()));
-    let words = format!("مانده حساب: {amount}");
+    let balance = fmt_currency(data.balance.abs(), &data.shop.currency);
+    let line_text = format!("مانده حساب: {balance}");
     sheet.page.push(
-        line(&words, 12.5, Weight::Bold)
+        line(&line_text, 12.5, Weight::Bold)
             .class(Class::Total)
             .at(base + 24.0)
             .right(RIGHT),

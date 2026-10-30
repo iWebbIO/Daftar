@@ -9,7 +9,7 @@ use crate::db::{self, Res};
 use crate::domain::{balance, orders, parties, settings};
 use crate::dto::Party;
 use crate::jalali;
-use crate::money::{fmt_amount, fmt_qty};
+use crate::money::{fmt_currency, fmt_amount, fmt_qty};
 use crate::Ctx;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -92,15 +92,15 @@ pub fn invoice_text(conn: &Connection, doc_id: i64) -> Res<String> {
     }
 
     out.push('\n');
-    out.push_str(&format!("جمع کل: {} تومان\n", fmt_amount(doc.total)));
+    out.push_str(&format!("جمع کل: {}\n", fmt_currency(doc.total, &s.currency)));
     if doc.discount > 0 {
-        out.push_str(&format!("تخفیف: {} تومان\n", fmt_amount(doc.discount)));
+        out.push_str(&format!("تخفیف: {}\n", fmt_currency(doc.discount, &s.currency)));
     }
     if doc.paid > 0 {
-        out.push_str(&format!("پرداخت شده: {} تومان\n", fmt_amount(doc.paid)));
+        out.push_str(&format!("پرداخت شده: {}\n", fmt_currency(doc.paid, &s.currency)));
     }
     if doc.remaining > 0 {
-        out.push_str(&format!("مانده: {} تومان\n", fmt_amount(doc.remaining)));
+        out.push_str(&format!("مانده: {}\n", fmt_currency(doc.remaining, &s.currency)));
     } else if doc.total > 0 {
         out.push_str("تسویه شده است.\n");
     }
@@ -157,10 +157,10 @@ pub fn statement_text(conn: &Connection, party_id: i64) -> Res<String> {
     }
 
     if bal > 0 {
-        out.push_str(&format!("مانده حساب: {} تومان\n", fmt_amount(bal)));
+        out.push_str(&format!("مانده حساب: {}\n", fmt_currency(bal, &s.currency)));
         out.push_str("طلب ما از شماست.\n");
     } else if bal < 0 {
-        out.push_str(&format!("مانده حساب: {} تومان\n", fmt_amount(-bal)));
+        out.push_str(&format!("مانده حساب: {}\n", fmt_currency(-bal, &s.currency)));
         out.push_str("طلب شما از ماست.\n");
     } else {
         out.push_str("حساب تسویه است. ممنون.\n");
