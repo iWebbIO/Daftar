@@ -64,13 +64,13 @@ LEFT JOIN (
 pub fn all(conn: &Connection) -> Res<HashMap<i64, i64>> {
     let mut stmt = conn
         .prepare(ALL_BALANCES)
-        .map_err(|e| format!("محاسبه حساب‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("محاسبه حساب‌ها نشد", e))?;
     let rows = stmt
         .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
-        .map_err(|e| format!("محاسبه حساب‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("محاسبه حساب‌ها نشد", e))?;
     let mut out = HashMap::new();
     for row in rows {
-        let (id, balance) = row.map_err(|e| format!("محاسبه حساب‌ها نشد: {e}"))?;
+        let (id, balance) = row.map_err(|e| crate::db::oops("محاسبه حساب‌ها نشد", e))?;
         out.insert(id, balance);
     }
     Ok(out)
@@ -83,7 +83,7 @@ pub fn of(conn: &Connection, party_id: i64) -> Res<i64> {
         |r| r.get::<_, i64>(0),
     )
     .optional()
-    .map_err(|e| format!("محاسبه حساب نشد: {e}"))
+    .map_err(|e| crate::db::oops("محاسبه حساب نشد", e))
     .map(|v| v.unwrap_or(0))
 }
 
@@ -111,7 +111,7 @@ pub fn paid_on(conn: &Connection, doc_id: i64) -> Res<i64> {
         [doc_id],
         |r| r.get::<_, i64>(0),
     )
-    .map_err(|e| format!("محاسبه پرداخت نشد: {e}"))
+    .map_err(|e| crate::db::oops("محاسبه پرداخت نشد", e))
 }
 
 pub fn unallocated(conn: &Connection, payment_id: i64) -> Res<i64> {
@@ -121,7 +121,7 @@ pub fn unallocated(conn: &Connection, payment_id: i64) -> Res<i64> {
         [payment_id],
         |r| r.get::<_, i64>(0),
     )
-    .map_err(|e| format!("محاسبه مانده نشد: {e}"))
+    .map_err(|e| crate::db::oops("محاسبه مانده نشد", e))
 }
 
 #[cfg(test)]

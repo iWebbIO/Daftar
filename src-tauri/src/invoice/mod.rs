@@ -177,7 +177,7 @@ fn load_party(conn: &Connection, party_id: i64) -> Res<Party> {
         },
     )
     .optional()
-    .map_err(|e| format!("طرف حساب خوانده نشد: {e}"))?
+    .map_err(|e| crate::db::oops("طرف حساب خوانده نشد", e))?
     .ok_or_else(|| "طرف حساب پیدا نشد".to_string())
 }
 
@@ -186,7 +186,7 @@ fn load_invoice(conn: &Connection, doc_id: i64) -> Res<layout::InvoiceData> {
     let doc: Doc = conn
         .query_row(&sql, [doc_id], |r| orders::from_row(r))
         .optional()
-        .map_err(|e| format!("فاکتور خوانده نشد: {e}"))?
+        .map_err(|e| crate::db::oops("فاکتور خوانده نشد", e))?
         .ok_or_else(|| "فاکتور پیدا نشد".to_string())?;
     let party = load_party(conn, doc.party_id)?;
     let lines = load_lines(conn, doc_id)?;
@@ -229,7 +229,7 @@ fn load_lines(conn: &Connection, doc_id: i64) -> Res<Vec<DocLine>> {
                     override_total, note, voided
              FROM doc_line WHERE doc_id = ?1 ORDER BY pos, id",
         )
-        .map_err(|e| format!("خط‌های فاکتور خوانده نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خط‌های فاکتور خوانده نشد", e))?;
     let rows = stmt
         .query_map([doc_id], |r| {
             Ok(DocLine {
@@ -247,9 +247,9 @@ fn load_lines(conn: &Connection, doc_id: i64) -> Res<Vec<DocLine>> {
                 voided: r.get::<_, i64>(11)? != 0,
             })
         })
-        .map_err(|e| format!("خط‌های فاکتور خوانده نشد: {e}"))?
+        .map_err(|e| crate::db::oops("خط‌های فاکتور خوانده نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خط‌های فاکتور خوانده نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خط‌های فاکتور خوانده نشد", e))?;
     Ok(rows)
 }
 
@@ -267,12 +267,12 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
     );
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| format!("صورت‌حساب خوانده نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("صورت‌حساب خوانده نشد", e))?;
     let docs = stmt
         .query_map([party_id], |r| orders::from_row(r))
-        .map_err(|e| format!("صورت‌حساب خوانده نشد: {e}"))?
+        .map_err(|e| crate::db::oops("صورت‌حساب خوانده نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("صورت‌حساب خوانده نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("صورت‌حساب خوانده نشد", e))?;
     for doc in docs {
         let title = if doc.kind == "purchase" {
             format!("خرید {}", crate::money::fa_digits(&doc.number.to_string()))
@@ -297,7 +297,7 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
             "SELECT id, direction, amount, day, method FROM payment
              WHERE party_id = ?1 AND voided = 0",
         )
-        .map_err(|e| format!("صورت‌حساب خوانده نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("صورت‌حساب خوانده نشد", e))?;
     let payments = stmt
         .query_map([party_id], |r| {
             Ok((
@@ -308,9 +308,9 @@ fn load_statement(conn: &Connection, party_id: i64) -> Res<layout::StatementData
                 r.get::<_, String>(4)?,
             ))
         })
-        .map_err(|e| format!("صورت‌حساب خوانده نشد: {e}"))?
+        .map_err(|e| crate::db::oops("صورت‌حساب خوانده نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("صورت‌حساب خوانده نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("صورت‌حساب خوانده نشد", e))?;
     for (id, direction, amount, day, method) in payments {
         let verb = if direction == "out" { "پرداخت" } else { "دریافت" };
         items.push((

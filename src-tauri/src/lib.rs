@@ -71,7 +71,7 @@ async fn call(app: tauri::AppHandle, op: String, args: Option<Value>) -> Result<
         route(&ctx, &op, &args)
     })
     .await
-    .map_err(|e| format!("اجرا نشد: {e}"))?
+    .map_err(|e| crate::db::oops("اجرا نشد", e))?
 }
 
 pub fn route(ctx: &Ctx<'_>, op: &str, args: &Value) -> Res<Value> {
@@ -104,7 +104,7 @@ pub fn run() {
             let base = app
                 .path()
                 .app_data_dir()
-                .map_err(|e| format!("پوشه داده پیدا نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("پوشه داده پیدا نشد", e))?;
             let dirs = Dirs {
                 data: base.clone(),
                 files: base.join("files"),

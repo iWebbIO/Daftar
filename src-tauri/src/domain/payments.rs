@@ -42,7 +42,7 @@ pub fn load(conn: &Connection, id: i64) -> Res<Payment> {
         from_row,
     )
     .optional()
-    .map_err(|e| format!("خواندن پرداخت نشد: {e}"))?
+    .map_err(|e| crate::db::oops("خواندن پرداخت نشد", e))?
     .ok_or_else(|| "پرداخت پیدا نشد".to_string())
 }
 
@@ -53,19 +53,19 @@ pub fn allocated_of(conn: &Connection, payment_id: i64) -> Res<i64> {
         [payment_id],
         |r| r.get(0),
     )
-    .map_err(|e| format!("محاسبه پرداخت نشد: {e}"))
+    .map_err(|e| crate::db::oops("محاسبه پرداخت نشد", e))
 }
 
 fn allocated_docs(conn: &Connection, payment_id: i64) -> Res<Vec<i64>> {
     let mut stmt = conn
         .prepare("SELECT DISTINCT doc_id FROM allocation WHERE payment_id = ?1")
-        .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
     let rows = stmt
         .query_map([payment_id], |r| r.get::<_, i64>(0))
-        .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
     let mut out = Vec::new();
     for row in rows {
-        out.push(row.map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?);
+        out.push(row.map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?);
     }
     Ok(out)
 }
@@ -82,12 +82,12 @@ fn spread(conn: &Connection, party_id: i64, kind: &str, amount: i64) -> Res<Vec<
              WHERE party_id = ?1 AND kind = ?2 AND status <> 'void'
              ORDER BY day ASC, id ASC",
         )
-        .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?;
     let ids = stmt
         .query_map(params![party_id, kind], |r| r.get::<_, i64>(0))
-        .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?
+        .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?;
 
     let mut left = amount;
     let mut out = Vec::new();
@@ -211,9 +211,9 @@ pub fn record(conn: &Connection, input: &PaymentInput, auto: bool) -> Res<Paymen
                     id
                 ],
             )
-            .map_err(|e| format!("ذخیره پرداخت نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("ذخیره پرداخت نشد", e))?;
             conn.execute("DELETE FROM allocation WHERE payment_id = ?1", [id])
-                .map_err(|e| format!("ذخیره پرداخت نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره پرداخت نشد", e))?;
             id
         }
         None => {
@@ -232,7 +232,7 @@ pub fn record(conn: &Connection, input: &PaymentInput, auto: bool) -> Res<Paymen
                     db::now_ms()
                 ],
             )
-            .map_err(|e| format!("ذخیره پرداخت نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("ذخیره پرداخت نشد", e))?;
             conn.last_insert_rowid()
         }
     };
@@ -254,7 +254,7 @@ pub fn record(conn: &Connection, input: &PaymentInput, auto: bool) -> Res<Paymen
             "INSERT INTO allocation(payment_id, doc_id, amount) VALUES(?1, ?2, ?3)",
             params![id, allocation.doc_id, allocation.amount],
         )
-        .map_err(|e| format!("نسبت دادن پرداخت نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("نسبت دادن پرداخت نشد", e))?;
         allocated += allocation.amount;
         touched.insert(allocation.doc_id);
     }
@@ -304,7 +304,7 @@ pub fn void(conn: &Connection, id: i64, reason: &str) -> Res<Payment> {
             "UPDATE payment SET voided = 1, void_reason = ?1 WHERE id = ?2",
             params![reason, id],
         )
-        .map_err(|e| format!("باطل کردن پرداخت نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("باطل کردن پرداخت نشد", e))?;
         for doc_id in touched {
             refresh_status(conn, doc_id)?;
         }
@@ -345,7 +345,7 @@ pub fn list(
     );
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
     let rows = stmt
         .query_map(params![party_id, from, to, limit], |r| {
             let payment = from_row(r)?;
@@ -357,10 +357,10 @@ pub fn list(
                 payment,
             })
         })
-        .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
     let mut out = Vec::new();
     for row in rows {
-        out.push(row.map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?);
+        out.push(row.map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?);
     }
     Ok(out)
 }
@@ -387,7 +387,7 @@ fn read<T: serde::de::DeserializeOwned>(args: &Value) -> Res<T> {
 }
 
 fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
-    serde_json::to_value(value).map_err(|e| format!("آماده کردن پاسخ نشد: {e}"))
+    serde_json::to_value(value).map_err(|e| crate::db::oops("آماده کردن پاسخ نشد", e))
 }
 
 /// What the payment screen sends. `types.ts` marks `ref` and `note` optional,

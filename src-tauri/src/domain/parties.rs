@@ -41,7 +41,7 @@ pub fn party_of(conn: &Connection, id: i64) -> Res<Party> {
         from_row,
     )
     .optional()
-    .map_err(|e| format!("خواندن طرف‌حساب نشد: {e}"))?
+    .map_err(|e| crate::db::oops("خواندن طرف‌حساب نشد", e))?
     .ok_or_else(|| "طرف‌حساب پیدا نشد".to_string())
 }
 
@@ -78,13 +78,13 @@ fn last_days(conn: &Connection) -> Res<HashMap<i64, i64>> {
                  SELECT party_id, day FROM payment WHERE voided = 0
              ) GROUP BY party_id",
         )
-        .map_err(|e| format!("خواندن آخرین کار نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن آخرین کار نشد", e))?;
     let rows = stmt
         .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
-        .map_err(|e| format!("خواندن آخرین کار نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن آخرین کار نشد", e))?;
     let mut out = HashMap::new();
     for row in rows {
-        let (id, day) = row.map_err(|e| format!("خواندن آخرین کار نشد: {e}"))?;
+        let (id, day) = row.map_err(|e| crate::db::oops("خواندن آخرین کار نشد", e))?;
         out.insert(id, day);
     }
     Ok(out)
@@ -93,13 +93,13 @@ fn last_days(conn: &Connection) -> Res<HashMap<i64, i64>> {
 fn open_counts(conn: &Connection) -> Res<HashMap<i64, i64>> {
     let mut stmt = conn
         .prepare("SELECT party_id, COUNT(*) FROM doc WHERE status = 'open' GROUP BY party_id")
-        .map_err(|e| format!("خواندن فاکتورهای باز نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن فاکتورهای باز نشد", e))?;
     let rows = stmt
         .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
-        .map_err(|e| format!("خواندن فاکتورهای باز نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن فاکتورهای باز نشد", e))?;
     let mut out = HashMap::new();
     for row in rows {
-        let (id, count) = row.map_err(|e| format!("خواندن فاکتورهای باز نشد: {e}"))?;
+        let (id, count) = row.map_err(|e| crate::db::oops("خواندن فاکتورهای باز نشد", e))?;
         out.insert(id, count);
     }
     Ok(out)
@@ -113,12 +113,12 @@ fn cards(conn: &Connection) -> Res<Vec<PartyCard>> {
     let open = open_counts(conn)?;
     let mut stmt = conn
         .prepare(&format!("SELECT {PARTY_COLUMNS} FROM party p ORDER BY p.name"))
-        .map_err(|e| format!("خواندن طرف‌حساب‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن طرف‌حساب‌ها نشد", e))?;
     let rows = stmt
         .query_map([], from_row)
-        .map_err(|e| format!("خواندن طرف‌حساب‌ها نشد: {e}"))?
+        .map_err(|e| crate::db::oops("خواندن طرف‌حساب‌ها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن طرف‌حساب‌ها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن طرف‌حساب‌ها نشد", e))?;
     Ok(rows
         .into_iter()
         .map(|party| PartyCard {
@@ -259,7 +259,7 @@ pub fn save(conn: &Connection, input: &PartyInput) -> Res<Party> {
                         id
                     ],
                 )
-                .map_err(|e| format!("ذخیره طرف‌حساب نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره طرف‌حساب نشد", e))?;
                 db::audit(
                     conn,
                     "party",
@@ -292,7 +292,7 @@ pub fn save(conn: &Connection, input: &PartyInput) -> Res<Party> {
                         now
                     ],
                 )
-                .map_err(|e| format!("ذخیره طرف‌حساب نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره طرف‌حساب نشد", e))?;
                 let id = conn.last_insert_rowid();
                 db::audit(
                     conn,
@@ -323,12 +323,12 @@ pub fn book(conn: &Connection, id: i64) -> Res<PartyBook> {
         );
         let mut stmt = conn
             .prepare(&sql)
-            .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?;
         let rows = stmt
             .query_map([id], orders::from_row)
-            .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?
+            .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?;
         rows
     };
 
@@ -341,12 +341,12 @@ pub fn book(conn: &Connection, id: i64) -> Res<PartyBook> {
         );
         let mut stmt = conn
             .prepare(&sql)
-            .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
         let rows = stmt
             .query_map([id], payments::from_row)
-            .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?
+            .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
         rows
     };
 
@@ -423,7 +423,7 @@ fn read<T: serde::de::DeserializeOwned>(args: &Value) -> Res<T> {
 }
 
 fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
-    serde_json::to_value(value).map_err(|e| format!("آماده کردن پاسخ نشد: {e}"))
+    serde_json::to_value(value).map_err(|e| crate::db::oops("آماده کردن پاسخ نشد", e))
 }
 
 #[derive(Deserialize)]

@@ -55,7 +55,7 @@ pub fn rows_on_day(conn: &Connection, day: i64) -> Res<Vec<DocRow>> {
         "SELECT {DOC_COLUMNS}, p.name FROM doc d JOIN party p ON p.id = d.party_id
          WHERE d.day = ?1 AND d.status <> 'void' ORDER BY d.id"
     );
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql).map_err(|e| crate::db::oops("دفتر خوانده نشد", e))?;
     let rows = stmt
         .query_map([day], |r| {
             Ok(DocRow {
@@ -63,9 +63,9 @@ pub fn rows_on_day(conn: &Connection, day: i64) -> Res<Vec<DocRow>> {
                 party_name: r.get(16)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        .map_err(|e| crate::db::oops("دفتر خوانده نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::db::oops("دفتر خوانده نشد", e))?;
     Ok(rows)
 }
 
@@ -75,10 +75,10 @@ pub fn rows_on_day(conn: &Connection, day: i64) -> Res<Vec<DocRow>> {
 pub fn in_tx<T>(conn: &Connection, f: impl FnOnce(&Connection) -> Res<T>) -> Res<T> {
     let tx = conn
         .unchecked_transaction()
-        .map_err(|e| format!("شروع ذخیره نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("شروع ذخیره نشد", e))?;
     match f(&tx) {
         Ok(value) => {
-            tx.commit().map_err(|e| format!("ذخیره کامل نشد: {e}"))?;
+            tx.commit().map_err(|e| crate::db::oops("ذخیره کامل نشد", e))?;
             Ok(value)
         }
         Err(e) => {
@@ -116,7 +116,7 @@ pub fn load(conn: &Connection, id: i64) -> Res<Doc> {
     let sql = format!("SELECT {DOC_COLUMNS} FROM doc d WHERE d.id = ?1");
     conn.query_row(&sql, [id], from_row)
         .optional()
-        .map_err(|e| format!("خواندن فاکتور نشد: {e}"))?
+        .map_err(|e| crate::db::oops("خواندن فاکتور نشد", e))?
         .ok_or_else(|| "فاکتور پیدا نشد".to_string())
 }
 
@@ -129,7 +129,7 @@ pub fn lines_of(conn: &Connection, doc_id: i64) -> Res<Vec<DocLine>> {
                     override_total, note, voided
              FROM doc_line WHERE doc_id = ?1 ORDER BY pos, id",
         )
-        .map_err(|e| format!("خواندن سطرها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?;
     let rows = stmt
         .query_map([doc_id], |r| {
             Ok(DocLine {
@@ -147,10 +147,10 @@ pub fn lines_of(conn: &Connection, doc_id: i64) -> Res<Vec<DocLine>> {
                 voided: r.get::<_, i64>(11)? != 0,
             })
         })
-        .map_err(|e| format!("خواندن سطرها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?;
     let mut out = Vec::new();
     for row in rows {
-        out.push(row.map_err(|e| format!("خواندن سطرها نشد: {e}"))?);
+        out.push(row.map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?);
     }
     Ok(out)
 }
@@ -171,7 +171,7 @@ fn next_number(conn: &Connection, kind: &str, jyear: i64) -> Res<i64> {
         params![kind, jyear],
         |r| r.get(0),
     )
-    .map_err(|e| format!("شماره فاکتور نشد: {e}"))
+    .map_err(|e| crate::db::oops("شماره فاکتور نشد", e))
 }
 
 /// The last price this party was charged for a product, if it was ever typed.
@@ -184,7 +184,7 @@ fn last_price(conn: &Connection, product_id: i64, party_id: i64, kind: &str) -> 
         |r| r.get(0),
     )
     .optional()
-    .map_err(|e| format!("خواندن قیمت قبلی نشد: {e}"))
+    .map_err(|e| crate::db::oops("خواندن قیمت قبلی نشد", e))
 }
 
 fn catalog_price(conn: &Connection, product_id: i64, kind: &str) -> Res<Option<i64>> {
@@ -195,7 +195,7 @@ fn catalog_price(conn: &Connection, product_id: i64, kind: &str) -> Res<Option<i
         |r| r.get(0),
     )
     .optional()
-    .map_err(|e| format!("خواندن قیمت کالا نشد: {e}"))
+    .map_err(|e| crate::db::oops("خواندن قیمت کالا نشد", e))
 }
 
 /// A line checked against the catalog: a product that has since been removed
@@ -209,7 +209,7 @@ fn resolve_line(conn: &Connection, line: &LineInput) -> Res<(Option<i64>, String
                 Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
             })
             .optional()
-            .map_err(|e| format!("خواندن کالا نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("خواندن کالا نشد", e))?;
         if catalog.is_none() {
             product_id = None;
         }
@@ -307,7 +307,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
                         doc.id
                     ],
                 )
-                .map_err(|e| format!("ذخیره فاکتور نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره فاکتور نشد", e))?;
                 (doc.id, doc.jyear, doc.number)
             }
             None => {
@@ -332,7 +332,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
                         now
                     ],
                 )
-                .map_err(|e| format!("ذخیره فاکتور نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره فاکتور نشد", e))?;
                 (conn.last_insert_rowid(), jyear, number)
             }
         };
@@ -347,16 +347,16 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
         if current.is_some() {
             let mut stmt = conn
                 .prepare("SELECT id FROM doc_line WHERE doc_id = ?1")
-                .map_err(|e| format!("خواندن سطرها نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?;
             let ids = stmt
                 .query_map([doc_id], |r| r.get::<_, i64>(0))
-                .map_err(|e| format!("خواندن سطرها نشد: {e}"))?
+                .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| format!("خواندن سطرها نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?;
             for old in ids {
                 if !keep.contains(&old) {
                     conn.execute("UPDATE doc_line SET voided = 1 WHERE id = ?1", [old])
-                        .map_err(|e| format!("خط‌خوردن سطر نشد: {e}"))?;
+                        .map_err(|e| crate::db::oops("خط‌خوردن سطر نشد", e))?;
                 }
             }
         }
@@ -391,7 +391,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
                             doc_id
                         ],
                     )
-                    .map_err(|e| format!("ذخیره سطر نشد: {e}"))?;
+                    .map_err(|e| crate::db::oops("ذخیره سطر نشد", e))?;
             }
             if changed == 0 {
                 conn.execute(
@@ -412,7 +412,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
                         line.voided as i64
                     ],
                 )
-                .map_err(|e| format!("ذخیره سطر نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره سطر نشد", e))?;
             }
         }
 
@@ -441,7 +441,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
                      VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
                     params![pid, input.party_id, history_kind, line.price, day, now],
                 )
-                .map_err(|e| format!("ثبت قیمت نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ثبت قیمت نشد", e))?;
                 latest.insert(pid, line.price);
             }
         }
@@ -457,7 +457,7 @@ pub fn save(conn: &Connection, input: &DocInput) -> Res<Doc> {
                     &format!("UPDATE product SET {column} = ?1, updated_at = ?2 WHERE id = ?3"),
                     params![line.price, now, pid],
                 )
-                .map_err(|e| format!("ذخیره قیمت کالا نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("ذخیره قیمت کالا نشد", e))?;
             }
         }
 
@@ -536,7 +536,7 @@ pub fn refresh_status(conn: &Connection, doc_id: i64) -> Res<()> {
          WHERE id = ?2",
         params![paid, doc_id],
     )
-    .map_err(|e| format!("ثبت وضعیت فاکتور نشد: {e}"))?;
+    .map_err(|e| crate::db::oops("ثبت وضعیت فاکتور نشد", e))?;
     Ok(())
 }
 
@@ -561,21 +561,21 @@ pub fn void(conn: &Connection, id: i64, reason: &str) -> Res<Doc> {
                      JOIN payment pm ON pm.id = a.payment_id
                      WHERE a.doc_id = ?1 AND pm.voided = 0",
                 )
-                .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
             let rows = stmt
                 .query_map([id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
-                .map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?;
             for row in rows {
-                released.push(row.map_err(|e| format!("خواندن پرداخت‌ها نشد: {e}"))?);
+                released.push(row.map_err(|e| crate::db::oops("خواندن پرداخت‌ها نشد", e))?);
             }
         }
         conn.execute("DELETE FROM allocation WHERE doc_id = ?1", [id])
-            .map_err(|e| format!("آزاد کردن پرداخت نشد: {e}"))?;
+            .map_err(|e| crate::db::oops("آزاد کردن پرداخت نشد", e))?;
         conn.execute(
             "UPDATE doc SET status = 'void', void_reason = ?1, updated_at = ?2 WHERE id = ?3",
             params![reason, db::now_ms(), id],
         )
-        .map_err(|e| format!("باطل کردن فاکتور نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("باطل کردن فاکتور نشد", e))?;
         db::audit(
             conn,
             "doc",
@@ -603,7 +603,7 @@ pub fn set_final(conn: &Connection, id: i64, is_final: bool) -> Res<Doc> {
             "UPDATE doc SET final = ?1, updated_at = ?2 WHERE id = ?3",
             params![is_final as i64, db::now_ms(), id],
         )
-        .map_err(|e| format!("ثبت فاکتور قطعی نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("ثبت فاکتور قطعی نشد", e))?;
         db::audit(
             conn,
             "doc",
@@ -628,7 +628,7 @@ pub fn repeat(conn: &Connection, id: i64) -> Res<DocInput> {
             "SELECT product_id, name, qty_milli, unit, price, note FROM doc_line
              WHERE doc_id = ?1 AND voided = 0 ORDER BY pos, id",
         )
-        .map_err(|e| format!("خواندن سطرها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?;
     let raw = stmt
         .query_map([id], |r| {
             Ok((
@@ -640,9 +640,9 @@ pub fn repeat(conn: &Connection, id: i64) -> Res<DocInput> {
                 r.get::<_, Option<String>>(5)?,
             ))
         })
-        .map_err(|e| format!("خواندن سطرها نشد: {e}"))?
+        .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("خواندن سطرها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن سطرها نشد", e))?;
 
     let mut lines = Vec::with_capacity(raw.len());
     for (product_id, name, qty_milli, unit, typed_price, note) in raw {
@@ -703,7 +703,7 @@ pub fn list(
     );
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?;
     let rows = stmt
         .query_map(params![kind, party_id, from, to, limit], |r| {
             Ok(DocRow {
@@ -711,10 +711,10 @@ pub fn list(
                 party_name: r.get(16)?,
             })
         })
-        .map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?;
+        .map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?;
     let mut out = Vec::new();
     for row in rows {
-        out.push(row.map_err(|e| format!("خواندن فاکتورها نشد: {e}"))?);
+        out.push(row.map_err(|e| crate::db::oops("خواندن فاکتورها نشد", e))?);
     }
     Ok(out)
 }
@@ -728,7 +728,7 @@ fn read<T: serde::de::DeserializeOwned>(args: &Value) -> Res<T> {
 }
 
 fn json_of<T: serde::Serialize>(value: T) -> Res<Value> {
-    serde_json::to_value(value).map_err(|e| format!("آماده کردن پاسخ نشد: {e}"))
+    serde_json::to_value(value).map_err(|e| crate::db::oops("آماده کردن پاسخ نشد", e))
 }
 
 #[derive(Deserialize)]

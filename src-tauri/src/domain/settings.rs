@@ -70,11 +70,11 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
     Some(match op {
         "settings.get" => (|| {
             let conn = ctx.conn()?;
-            Ok(serde_json::to_value(load(&conn)).map_err(|e| e.to_string())?)
+            Ok(serde_json::to_value(load(&conn)).map_err(|e| crate::db::oops("تنظیم‌ها خوانده نشد", e))?)
         })(),
         "settings.save" => (|| {
             let a: SaveArgs = serde_json::from_value(args.clone())
-                .map_err(|e| format!("تنظیم‌ها خوانده نشد: {e}"))?;
+                .map_err(|e| crate::db::oops("تنظیم‌ها خوانده نشد", e))?;
             let conn = ctx.conn()?;
             save(&conn, &a.settings)?;
             Ok(Value::Bool(true))

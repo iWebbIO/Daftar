@@ -30,12 +30,12 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
                 "SELECT d.kind, d.total FROM doc d
                  WHERE d.day = ?1 AND d.status <> 'void'",
             )
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
         let rows = stmt
             .query_map([day], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
         for row in rows {
-            let (kind, total) = row.map_err(|e| e.to_string())?;
+            let (kind, total) = row.map_err(|e| db::oops("دفتر خوانده نشد", e))?;
             if kind == "sale" {
                 sold += total;
             } else {
@@ -50,12 +50,12 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
                 "SELECT direction, amount FROM payment
                  WHERE day = ?1 AND voided = 0",
             )
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
         let rows = stmt
             .query_map([day], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
         for row in rows {
-            let (direction, amount) = row.map_err(|e| e.to_string())?;
+            let (direction, amount) = row.map_err(|e| db::oops("دفتر خوانده نشد", e))?;
             if direction == "in" {
                 received += amount;
             } else {
@@ -73,7 +73,7 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
              WHERE t.done = 0 AND (t.day IS NULL OR t.day <= ?1)
              ORDER BY COALESCE(t.day, 0) DESC, t.id DESC LIMIT 40",
         )
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
     let tasks = stmt
         .query_map([day], |r| {
             Ok(TaskRow {
@@ -88,9 +88,9 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
                 party_name: r.get(6)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        .map_err(|e| db::oops("دفتر خوانده نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
 
     let mut stmt = conn
         .prepare(
@@ -100,7 +100,7 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
              WHERE c.status = 'pending' AND c.due_day <= ?1 + 7
              ORDER BY c.due_day ASC LIMIT 20",
         )
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
     let cheques = stmt
         .query_map([day], |r| {
             Ok(ChequeRow {
@@ -120,9 +120,9 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
                 party_name: r.get(11)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        .map_err(|e| db::oops("دفتر خوانده نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| db::oops("دفتر خوانده نشد", e))?;
 
     let totals = balance::totals(conn)?;
     let j = jalali::d2j(day);
@@ -150,7 +150,7 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
             let a: DayArgs = serde_json::from_value(args.clone()).unwrap_or(DayArgs { day: None });
             let day = a.day.unwrap_or_else(db::today);
             let conn = ctx.conn()?;
-            Ok(serde_json::to_value(build(&conn, day)?).map_err(|e| e.to_string())?)
+            Ok(serde_json::to_value(build(&conn, day)?).map_err(|e| db::oops("دفتر خوانده نشد", e))?)
         })(),
         _ => return None,
     })

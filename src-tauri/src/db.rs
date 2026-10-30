@@ -20,6 +20,17 @@ pub fn today() -> i64 {
     crate::jalali::today().jdn()
 }
 
+/// A short Persian sentence for the shopkeeper, and the technical detail on
+/// stderr where it helps nobody in the shop but everything in a bug report.
+///
+/// Every failure that can reach a screen goes through here or through a literal
+/// Persian sentence: a SQLite message in front of a customer is the one thing
+/// this app must never do.
+pub fn oops(what: &str, detail: impl std::fmt::Display) -> String {
+    eprintln!("{what}: {detail}");
+    what.to_string()
+}
+
 /// Opens the database, applying the schema and the durability settings.
 ///
 /// WAL with `synchronous=NORMAL` is the right trade for a shop phone: a save
@@ -27,25 +38,25 @@ pub fn today() -> i64 {
 /// every single statement.
 pub fn open(path: &Path) -> Res<Connection> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("ساخت پوشه داده نشد: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| oops("پوشه داده ساخته نشد", e))?;
     }
-    let conn = Connection::open(path).map_err(|e| format!("باز کردن دفتر نشد: {e}"))?;
+    let conn = Connection::open(path).map_err(|e| oops("دفتر باز نشد", e))?;
     conn.pragma_update(None, "journal_mode", "WAL")
-        .map_err(|e| format!("تنظیم ژورنال نشد: {e}"))?;
+        .map_err(|e| oops("دفتر آماده نشد", e))?;
     conn.pragma_update(None, "synchronous", "NORMAL")
-        .map_err(|e| format!("تنظیم همگام‌سازی نشد: {e}"))?;
+        .map_err(|e| oops("دفتر آماده نشد", e))?;
     conn.pragma_update(None, "foreign_keys", true)
-        .map_err(|e| format!("تنظیم کلید خارجی نشد: {e}"))?;
+        .map_err(|e| oops("دفتر آماده نشد", e))?;
     conn.busy_timeout(std::time::Duration::from_secs(5))
-        .map_err(|e| format!("تنظیم انتظار پایگاه‌داده نشد: {e}"))?;
+        .map_err(|e| oops("دفتر آماده نشد", e))?;
     conn.execute_batch(SCHEMA)
-        .map_err(|e| format!("آماده‌سازی دفتر نشد: {e}"))?;
+        .map_err(|e| oops("دفتر آماده نشد", e))?;
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap_or(0);
     if version < SCHEMA_VERSION {
         conn.pragma_update(None, "user_version", SCHEMA_VERSION)
-            .map_err(|e| format!("ثبت نسخه نشد: {e}"))?;
+            .map_err(|e| oops("دفتر آماده نشد", e))?;
     }
     Ok(conn)
 }
@@ -65,7 +76,7 @@ pub fn put_setting(conn: &Connection, key: &str, value: &str) -> Res<()> {
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         rusqlite::params![key, value],
     )
-    .map_err(|e| format!("ذخیره تنظیم نشد: {e}"))?;
+    .map_err(|e| oops("ذخیره نشد", e))?;
     Ok(())
 }
 
@@ -76,7 +87,7 @@ pub fn audit(conn: &Connection, entity: &str, entity_id: i64, action: &str, payl
         "INSERT INTO audit(entity, entity_id, action, payload, at) VALUES(?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![entity, entity_id, action, payload, now_ms()],
     )
-    .map_err(|e| format!("ثبت تاریخچه نشد: {e}"))?;
+    .map_err(|e| oops("ثبت نشد", e))?;
     Ok(())
 }
 
