@@ -2,7 +2,7 @@
 // besides its own data: a way to move, and a way to say something went wrong.
 
 import { createContext, useContext } from "react";
-import type { Settings } from "./types";
+import type { Settings, UpdateInfo } from "./types";
 
 export type Route =
   | { name: "today" }
@@ -94,6 +94,8 @@ export function hashToRoute(hash: string): Route {
 export interface AppContextValue {
   nav: Nav;
   settings: Settings | null;
+  /** Set once the startup check finds a newer release; null while it is current. */
+  update: UpdateInfo | null;
   reloadSettings: () => Promise<void>;
   toast: (text: string, tone?: "plain" | "ok" | "bad") => void;
 }

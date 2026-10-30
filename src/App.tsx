@@ -1,11 +1,11 @@
 // The shell: one stack of screens, one tab bar, one place a message appears.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, errorText } from "./api";
+import { api, errorText, inApp } from "./api";
 import { setCurrency } from "./format";
 import { AppCtx, type Nav, type Route, hashToRoute, routeToHash } from "./nav";
 import { Icon } from "./ui/kit";
-import type { Settings } from "./types";
+import type { Settings, UpdateInfo } from "./types";
 
 import Today from "./screens/Today";
 import Parties from "./screens/Parties";
@@ -41,8 +41,34 @@ export default function App() {
   const [stack, setStack] = useState<Route[]>(() => [hashToRoute(window.location.hash)]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
 
   const route = stack[stack.length - 1]!;
+
+  // The startup check runs in Rust; when it finds a newer release it says so
+  // here, and the home page mentions it — an update should not be something he
+  // has to dig for at the bottom of settings.
+  useEffect(() => {
+    if (!inApp()) {
+      // The preview has no Rust to emit the event, so ask the mock directly: the
+      // nudge is worth being able to look at.
+      void api
+        .updateCheck()
+        .then(setUpdate)
+        .catch(() => undefined);
+      return;
+    }
+    let stop: (() => void) | undefined;
+    void (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        stop = await listen<UpdateInfo>("daftar://update", (e) => setUpdate(e.payload));
+      } catch {
+        // no event channel outside the app
+      }
+    })();
+    return () => stop?.();
+  }, []);
 
   // Each screen keeps an address, so the phone's back gesture, a reload and the
   // screenshot harness all land on the same place.
@@ -178,7 +204,7 @@ export default function App() {
   const chromeFree = route.name === "order" || route.name === "payment";
 
   return (
-    <AppCtx.Provider value={{ nav, settings, reloadSettings, toast }}>
+    <AppCtx.Provider value={{ nav, settings, update, reloadSettings, toast }}>
       <div className="app-viewport">
         <div className="app-frame">
           <div className="screen" key={`${route.name}-${"id" in route ? route.id ?? "" : ""}`}>

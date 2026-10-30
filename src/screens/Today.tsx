@@ -11,7 +11,7 @@ import "./today.css";
 
 export default function Today() {
   const nav = useNav();
-  const { toast, settings } = useApp();
+  const { toast, settings, update } = useApp();
   const [view, setView] = useState<TodayView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +70,13 @@ export default function Today() {
           <button className="connectbot" onClick={() => nav.go({ name: "settings" })}>
             <Icon name="send" size={17} />
             <span>به تلگرام وصل نیست</span>
+          </button>
+        )}
+
+        {update?.behind && (
+          <button className="connectbot" onClick={() => nav.go({ name: "settings" })}>
+            <Icon name="today" size={17} />
+            <span>نسخه جدید هست</span>
           </button>
         )}
 
