@@ -143,7 +143,7 @@ export default function Parties() {
         ) : cards.length === 0 ? (
           <Empty
             title="هنوز کسی در دفتر نیست"
-            hint="اولین فاکتور را که بنویسی، نام مشتری همین‌جا می‌آید."
+            hint="هنوز کسی نیست"
             action={<Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور جدید</Btn>}
           />
         ) : q.trim() !== "" ? (

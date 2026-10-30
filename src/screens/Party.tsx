@@ -168,7 +168,7 @@ export default function Party(props: { id: number }) {
       // No share sheet here: the words are still worth having on the clipboard.
       try {
         await navigator.clipboard.writeText(text);
-        toast("متن صورت حساب کپی شد؛ در پیام‌رسان بچسبان", "ok");
+        toast("متن کپی شد", "ok");
       } catch {
         toast("اشتراک‌گذاری روی این گوشی نیست", "bad");
       }
@@ -262,7 +262,7 @@ export default function Party(props: { id: number }) {
             </Card>
           </>
         ) : (
-          <Empty title="حساب خالی است" hint="هنوز چیزی برای این نام نوشته نشده." />
+          <Empty title="حساب خالی است" />
         )}
 
         <Card tight>

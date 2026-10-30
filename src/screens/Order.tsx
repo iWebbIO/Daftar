@@ -335,7 +335,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
     if (!party || busy) return;
     setBusy(true);
     try {
-      await api.saveDoc({
+      const saved = await api.saveDoc({
         id: id ?? null,
         kind: props.kind,
         partyId: party.id,
@@ -350,7 +350,10 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         updatePrices: false,
       });
       toast(id ? "فاکتور ذخیره شد" : "فاکتور ثبت شد", "ok");
-      if (nav.canGoBack) nav.back();
+      // The invoice is not finished until it is in the customer's hands: land him
+      // on the page that has the send button, not back on the day's list.
+      if (!id) nav.replace({ name: "invoice", docId: saved.id });
+      else if (nav.canGoBack) nav.back();
       else nav.replace({ name: "today" });
     } catch (e) {
       toast(errorText(e), "bad");
@@ -601,21 +604,25 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         )}
         {!writing && (
           <>
-            <div className="ord-total__row">
-              <button
-                className={`ord-chip ord-chip--soft ${discount !== 0 ? "is-on" : ""}`}
-                onClick={() => openPad({ mode: "discount" }, discount ? String(discount) : "")}
-              >
-                تخفیف
-              </button>
-              <button
-                className={`ord-chip ord-chip--soft ${final ? "is-on" : ""}`}
-                onClick={() => setFinal(!final)}
-                aria-pressed={final}
-              >
-                قطعی
-              </button>
-            </div>
+            {/* تخفیف and قطعی act on a total that does not exist yet, so they
+                wait until there is something to discount. */}
+            {lines.some((l) => !l.voided) && (
+              <div className="ord-total__row">
+                <button
+                  className={`ord-chip ord-chip--soft ${discount !== 0 ? "is-on" : ""}`}
+                  onClick={() => openPad({ mode: "discount" }, discount ? String(discount) : "")}
+                >
+                  تخفیف
+                </button>
+                <button
+                  className={`ord-chip ord-chip--soft ${final ? "is-on" : ""}`}
+                  onClick={() => setFinal(!final)}
+                  aria-pressed={final}
+                >
+                  قطعی
+                </button>
+              </div>
+            )}
             <Btn
               wide
               size="lg"
