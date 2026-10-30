@@ -151,8 +151,8 @@ export default function SettingsScreen() {
           <Row
             leading={<Icon name="send" />}
             title={s.chatId ? "وصل است" : "وصل نیست"}
-            sub={s.chatId ? undefined : "کد ربات را بگذار تا وصل شود"}
-            value={s.chatId ? <Pill tone="pos">آماده</Pill> : <Pill tone="warn">نصب نشده</Pill>}
+            sub={s.chatId ? undefined : "کد ربات"}
+            value={s.chatId ? <Pill tone="pos">آماده</Pill> : undefined}
             onClick={() => setTokenSheet(true)}
           />
         </Card>
@@ -164,7 +164,7 @@ export default function SettingsScreen() {
             title={s.lastBackupAt ? `آخرین پشتیبان: ${longDate(dayOf(new Date(s.lastBackupAt)))}` : "هنوز پشتیبان نگرفته‌ای"}
             sub={s.lastBackupAt ? saat(s.lastBackupAt) : "هر روز خودش می‌فرستد"}
             value={
-              s.chatId ? undefined : <span className="faint tiny">بدون تلگرام فقط روی گوشی</span>
+              s.chatId ? undefined : <span className="faint tiny">فقط روی گوشی</span>
             }
           />
           <div style={{ padding: "4px 14px 12px" }}>
@@ -212,13 +212,12 @@ export default function SettingsScreen() {
                 void save({ theme: v });
               }}
             />
-            <div className="tiny faint">برای مغازه روشن بهتر است.</div>
           </div>
         </Card>
 
         {!inApp() && (
           <div className="tiny faint" style={{ marginTop: 16, textAlign: "center" }}>
-            این نسخه فقط برای دیدن ظاهر است و به دفتر اصلی وصل نیست.
+            فقط پیش‌نمایش
           </div>
         )}
 
@@ -314,7 +313,6 @@ function UpdateCard() {
         )}
         {!info && (
           <div className="tiny faint" style={{ padding: "0 14px 14px" }}>
-            الان نسخه‌ای برای گفتن نیست.
           </div>
         )}
       </Card>
