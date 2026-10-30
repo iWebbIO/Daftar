@@ -129,6 +129,56 @@ for (const [i, name] of ROUTES.entries()) {
       null;
     const pr = primary?.getBoundingClientRect();
 
+    // Fingers, not cursors: anything tappable smaller than 44px is a target he
+    // will miss in a shop, one-handed.
+    const small = [...document.querySelectorAll("button, [role=button], a")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return false;
+        if (getComputedStyle(el).visibility === "hidden") return false;
+        return r.height < 44 || r.width < 44;
+      })
+      .slice(0, 5)
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        const label = el.textContent?.trim().slice(0, 14) || el.className || el.tagName;
+        return `${label}(${Math.round(r.width)}x${Math.round(r.height)})`;
+      });
+
+    // Contrast of text against what is actually behind it.
+    const srgb = (v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const lum = ([r, g, b]) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+    const parse = (c) => (c.match(/[\d.]+/g) ?? []).map(Number);
+    const behind = (el) => {
+      let node = el;
+      while (node) {
+        const bg = parse(getComputedStyle(node).backgroundColor || "");
+        if (bg.length >= 3 && (bg[3] === undefined || bg[3] > 0.5)) return bg;
+        node = node.parentElement;
+      }
+      return [255, 255, 255];
+    };
+    const lowContrast = [];
+    for (const el of document.querySelectorAll(".row__sub, .row__note, .tiny, .faint, .muted, .label")) {
+      const own = [...el.childNodes]
+        .filter((n) => n.nodeType === 3)
+        .map((n) => n.textContent)
+        .join("")
+        .trim();
+      if (!own) continue;
+      const fg = parse(getComputedStyle(el).color);
+      const bg = behind(el);
+      const l1 = lum(fg.slice(0, 3));
+      const l2 = lum(bg.slice(0, 3));
+      const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      if (ratio < 3.2) {
+        lowContrast.push(`${own.slice(0, 14)} ${ratio.toFixed(1)}:1`);
+      }
+    }
+
     return {
       sideways: document.documentElement.scrollWidth - vw,
       clipped,
@@ -136,6 +186,8 @@ for (const [i, name] of ROUTES.entries()) {
       gapWhere,
       biggest,
       primaryTop: pr ? Math.round(pr.top / vh) : null,
+      small,
+      lowContrast: [...new Set(lowContrast)].slice(0, 4),
     };
   });
 
@@ -149,6 +201,8 @@ for (const [i, name] of ROUTES.entries()) {
     blocking += 1;
   }
   if (m.gap > 180) flags.push(`GAP ${m.gap}px (${m.gapWhere})`);
+  if (m.small.length) flags.push(`SMALL ${m.small.join(",")}`);
+  if (m.lowContrast.length) flags.push(`FAINT ${m.lowContrast.join(",")}`);
 
   report.push(
     `${name.padEnd(14)} ${flags.length ? flags.join("  ") : "ok"}` +

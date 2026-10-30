@@ -78,7 +78,7 @@
 /* The two quiet choices beside the total: they are not money, so they are not
    dressed like money. */
 .ord-chip--soft {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 13px;
   font-size: 13px;
   background: var(--surface-2);
@@ -321,7 +321,7 @@
 /* ---------------------------------------------------------------- misc */
 
 .ord-change {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 11px;
   background: var(--surface-2);
