@@ -233,6 +233,87 @@ pub struct TaskRow {
     pub party_name: Option<String>,
 }
 
+// ---- inputs -----------------------------------------------------------------
+//
+// What the interface sends when it creates or edits something. `id` absent means
+// "make a new one"; every other field may be absent so a screen that changes one
+// thing does not have to send the whole record back.
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PartyInput {
+    pub id: Option<i64>,
+    pub name: String,
+    pub phone: Option<String>,
+    pub kind: Option<String>,
+    pub address: Option<String>,
+    pub note: Option<String>,
+    pub opening: Option<i64>,
+    pub archived: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductInput {
+    pub id: Option<i64>,
+    pub name: String,
+    pub unit: Option<String>,
+    pub sale_price: Option<i64>,
+    pub buy_price: Option<i64>,
+    pub active: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskInput {
+    pub id: Option<i64>,
+    pub text: String,
+    pub day: Option<i64>,
+    pub party_id: Option<i64>,
+    pub done: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteInput {
+    pub id: Option<i64>,
+    pub day: Option<i64>,
+    pub title: Option<String>,
+    pub body: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChequeInput {
+    pub id: Option<i64>,
+    pub party_id: i64,
+    pub direction: Option<String>,
+    pub number: Option<String>,
+    pub bank: Option<String>,
+    pub amount: i64,
+    pub due_day: i64,
+    pub note: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SumSheetInput {
+    pub id: Option<i64>,
+    pub day: Option<i64>,
+    pub title: Option<String>,
+    pub rows: Vec<SumRowInput>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SumRowInput {
+    pub id: Option<i64>,
+    pub label: String,
+    pub amount: i64,
+    pub party_id: Option<i64>,
+    pub struck: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {

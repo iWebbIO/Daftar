@@ -130,7 +130,7 @@ pub fn build(conn: &Connection, day: i64) -> Res<TodayView> {
     Ok(TodayView {
         day,
         jalali: j.short(),
-        jalaliLong: j.long(),
+        jalali_long: j.long(),
         weekday: jalali::weekday_name(day).to_string(),
         sold,
         bought,

@@ -55,11 +55,20 @@ impl Ctx<'_> {
 
 /// The single entry point. Every operation in the app is a name plus arguments,
 /// which keeps the interface and the tests speaking the same language.
+///
+/// This is `async` and hands the work to a blocking thread on purpose: sending
+/// an invoice or waiting for the shopkeeper to press Start on his bot can take
+/// half a minute, and none of that may stall the window.
 #[tauri::command]
-fn call(op: String, args: Option<Value>, state: tauri::State<'_, AppState>) -> Result<Value, String> {
-    let ctx = Ctx { state: &state };
+async fn call(app: tauri::AppHandle, op: String, args: Option<Value>) -> Result<Value, String> {
     let args = args.unwrap_or(Value::Object(Default::default()));
-    route(&ctx, &op, &args)
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let ctx = Ctx { state: &state };
+        route(&ctx, &op, &args)
+    })
+    .await
+    .map_err(|e| format!("اجرا نشد: {e}"))?
 }
 
 pub fn route(ctx: &Ctx<'_>, op: &str, args: &Value) -> Res<Value> {
@@ -96,6 +105,18 @@ pub fn run() {
                 db: Mutex::new(conn),
                 dirs,
             });
+
+            // The daily snapshot: one quiet check at start, on its own thread,
+            // so a slow or missing network never delays the first screen.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let state = handle.state::<AppState>();
+                let ctx = Ctx { state: &state };
+                if backup::due(&ctx) {
+                    let _ = route(&ctx, "backup.now", &Value::Object(Default::default()));
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![call])

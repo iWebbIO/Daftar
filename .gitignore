@@ -17,3 +17,4 @@ src-tauri/gen/apple/
 
 .DS_Store
 Thumbs.db
+src-tauri/gen/schemas/

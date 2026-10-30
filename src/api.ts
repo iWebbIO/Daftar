@@ -5,6 +5,7 @@
 // writes a stringly-typed call by hand twice.
 
 import { invoke } from "@tauri-apps/api/core";
+import { mockCall } from "./mock";
 import type {
   AgeBucket,
   BackupInfo,
@@ -35,7 +36,16 @@ import type {
   Totals,
 } from "./types";
 
+/** True inside the app; false when the interface is open in a plain browser. */
+export const inApp = (): boolean =>
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 async function call<T>(op: string, args: unknown = {}): Promise<T> {
+  if (!inApp()) {
+    // Designing in a browser has no Rust behind it, so a small ledger in memory
+    // answers instead. It is never reached inside the built app.
+    return (await mockCall(op, (args ?? {}) as Record<string, unknown>)) as T;
+  }
   return (await invoke<T>("call", { op, args })) as T;
 }
 

@@ -11,7 +11,9 @@ export default defineConfig({
   server: {
     port: 5183,
     strictPort: true,
-    host: host || false,
+    // Bind IPv4 explicitly: Tauri's devUrl and any tool that resolves
+    // `localhost` to 127.0.0.1 must reach the same server.
+    host: host || "127.0.0.1",
     hmr: host ? { protocol: "ws", host, port: 5184 } : undefined,
     watch: { ignored: ["**/src-tauri/**"] },
   },
