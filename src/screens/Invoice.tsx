@@ -33,6 +33,8 @@ export default function Invoice(props: { docId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [which, setWhich] = useState<"tg" | "share" | null>(null);
+  /** The message on screen, when neither the sheet nor the clipboard works. */
+  const [manually, setManually] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,7 +100,9 @@ export default function Invoice(props: { docId: number }) {
         await navigator.clipboard.writeText(text);
         toast("متن کپی شد", "ok");
       } catch {
-        toast("اشتراک‌گذاری روی این گوشی نیست", "bad");
+        // Last resort: put the message on screen so he can select and copy it
+        // himself. A dead end in front of a customer is not acceptable.
+        setManually(text);
       }
     }
     setWhich(null);
@@ -290,6 +294,16 @@ export default function Invoice(props: { docId: number }) {
             onClick={() => void shareIt()}
           />
         </Card>
+      </Sheet>
+
+      <Sheet open={manually !== null} onClose={() => setManually(null)} title="متن فاکتور">
+        <Field
+          label="این را بردار"
+          value={manually ?? ""}
+          onChange={(v) => setManually(v)}
+          multiline
+          rows={8}
+        />
       </Sheet>
 
       <Sheet open={voiding} onClose={() => setVoiding(false)} title="خط زدن فاکتور">
