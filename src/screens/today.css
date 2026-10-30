@@ -183,3 +183,13 @@
 .connectbot:active {
   filter: brightness(0.97);
 }
+/* Very narrow phones (320pt): the two day sums share the width with the tab bar
+   and a nine-digit figure has to fit, so the type gives way. */
+@media (max-width: 360px) {
+  .today-sum .money--lg {
+    font-size: 17px;
+  }
+  .sumcell__label {
+    font-size: 11px;
+  }
+}

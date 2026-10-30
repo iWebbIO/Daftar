@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "../api";
 import { currencyLabel, fa, fmtAmount, fmtQty, lineTotal, parseAmount, parseQty } from "../format";
-import { today } from "../jalali";
+import { relativeDay, today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { Doc, LineInput, Party, PartyCard, Product } from "../types";
 import {
@@ -76,6 +76,9 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
   const [discount, setDiscount] = useState(0);
   const [final, setFinal] = useState(false);
   const [doc, setDoc] = useState<Doc | null>(null);
+  /** Which day this paper belongs to: forgetting yesterday is normal. */
+  const [day, setDay] = useState<number>(() => today());
+
   const [previous, setPrevious] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -112,6 +115,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
           const full = await api.doc(id);
           setParty(full.party);
           setDoc(full.doc);
+        setDay(full.doc.day);
           setDiscount(full.doc.discount);
           setFinal(full.doc.final);
           setLines(
@@ -339,7 +343,7 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
         id: id ?? null,
         kind: props.kind,
         partyId: party.id,
-        day: doc?.day ?? today(),
+        day,
         discount,
         roundStep,
         note: doc?.note ?? null,
@@ -445,9 +449,25 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
           doc ? (
             <Pill tone="brand">شماره {fa(doc.number)}</Pill>
           ) : party ? (
-            <button className="ord-change" onClick={() => setParty(null)}>
-              تغییر
-            </button>
+            <>
+              {/* Forgetting yesterday is normal, so the date is one tap away:
+                  each tap steps back a day, and «امروز» brings it home. */}
+              <button
+                className="ord-when"
+                onClick={() => setDay((d) => Math.max(today() - 30, d - 1))}
+                aria-label="تاریخ فاکتور"
+              >
+                {relativeDay(day)}
+              </button>
+              {day !== today() && (
+                <button className="ord-change" onClick={() => setDay(today())}>
+                  امروز
+                </button>
+              )}
+              <button className="ord-change" onClick={() => setParty(null)}>
+                تغییر
+              </button>
+            </>
           ) : undefined
         }
       />
@@ -766,6 +786,8 @@ export default function Order(props: { kind: "sale" | "purchase"; id?: number; p
       </Sheet>
 
       {/* ---- a new customer, with nothing but a name ---- */}
+
+
       <Sheet open={adding} onClose={() => setAdding(false)} title="مشتری جدید">
         <Field
           label="نام"

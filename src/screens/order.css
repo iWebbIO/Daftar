@@ -331,3 +331,18 @@
 .ord-change:active {
   background: var(--brand-soft);
 }
+
+/* The date badge in the head: a paper can belong to yesterday. */
+.ord-when {
+  padding: 0 12px;
+  min-height: 44px;
+  min-width: 48px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.ord-when:active {
+  background: var(--brand-soft);
+}

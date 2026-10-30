@@ -206,3 +206,9 @@
   margin-bottom: calc(var(--nav-h) + var(--safe-b));
   background: linear-gradient(to top, var(--paper) 62%, transparent);
 }
+
+@media (max-width: 360px) {
+  .ch-sum__num {
+    font-size: 17px;
+  }
+}
