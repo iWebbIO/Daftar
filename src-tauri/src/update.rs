@@ -419,26 +419,6 @@ fn json_of<T: Serialize>(value: T) -> Res<Value> {
 /// A release, shaped the way GitHub sends it. Used by the tests and by nothing
 /// else, so the real parsing is exercised against the real field names.
 #[cfg(test)]
-/// A release tag that is always newer than the build running the tests.
-/// Pinning a literal tag here meant that cutting that release broke the suite.
-fn newer_tag() -> String {
-    let major: u32 = env!("DAFTAR_VERSION")
-        .split('.')
-        .next()
-        .and_then(|m| m.parse().ok())
-        .unwrap_or(0);
-    format!("v{}.0.0", major + 1)
-}
-
-fn newer_version() -> String {
-    newer_tag().trim_start_matches('v').to_string()
-}
-
-/// The apk asset name GitHub would publish for that tag.
-fn apk_name() -> String {
-    format!("Daftar-{}.apk", newer_version())
-}
-
 fn release_json(tag: &str, assets: &[(&str, &str)]) -> Value {
     let assets: Vec<Value> = assets
         .iter()
@@ -451,6 +431,26 @@ fn release_json(tag: &str, assets: &[(&str, &str)]) -> Value {
 mod tests {
     use super::*;
     use std::cell::RefCell;
+
+    /// A release tag that is always newer than the build running the tests.
+    /// Pinning a literal here meant that cutting that release broke the suite.
+    fn newer_tag() -> String {
+        let major: u32 = env!("DAFTAR_VERSION")
+            .split('.')
+            .next()
+            .and_then(|m| m.parse().ok())
+            .unwrap_or(0);
+        format!("v{}.0.0", major + 1)
+    }
+
+    fn newer_version() -> String {
+        newer_tag().trim_start_matches('v').to_string()
+    }
+
+    /// The apk asset name GitHub would publish for that tag.
+    fn apk_name() -> String {
+        format!("Daftar-{}.apk", newer_version())
+    }
     use std::sync::atomic::{AtomicU32, Ordering};
 
     // ---------------------------------------------------------------- versions
