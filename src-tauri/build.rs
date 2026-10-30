@@ -13,6 +13,11 @@ fn main() {
             .and_then(|rest| rest.split('"').nth(1))
             .unwrap_or("0.0.0");
         println!("cargo:rustc-env=DAFTAR_VERSION={version}");
+    } else {
+        // Never leave the variable unset: `env!("DAFTAR_VERSION")` is a compile
+        // error if it is missing, and a build that cannot read one file should
+        // not stop the whole release.
+        println!("cargo:rustc-env=DAFTAR_VERSION=0.0.0");
     }
     println!("cargo:rerun-if-changed=tauri.conf.json");
 
