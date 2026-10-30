@@ -145,7 +145,7 @@ fn checked_plan(
         out.push(allocation.clone());
     }
     if total > input.amount {
-        return Err("بیشتر از مبلغ پرداخت نمی‌شود به فاکتور بست".to_string());
+        return Err("این بیشتر از خودِ پرداخت است".to_string());
     }
     Ok(out)
 }
@@ -563,7 +563,7 @@ mod tests {
         };
         assert_eq!(
             save(&conn, &over_allocated).unwrap_err(),
-            "بیشتر از مبلغ پرداخت نمی‌شود به فاکتور بست".to_string()
+            "این بیشتر از خودِ پرداخت است".to_string()
         );
 
         // money paid out does not pay a sale

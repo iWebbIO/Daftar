@@ -111,7 +111,8 @@ export default function Tasks() {
 
       <Body>
         {nothingLeft ? (
-          <Empty title="هنوز کاری ننوشته‌ای" />
+          // the head already carries the empty count; the footer carries the action
+          null
         ) : undone.length > 0 ? (
           <Card tight>
             {undone.map(({ task, partyName }) => (

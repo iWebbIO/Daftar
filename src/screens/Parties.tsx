@@ -143,7 +143,6 @@ export default function Parties() {
         ) : cards.length === 0 ? (
           <Empty
             title="هنوز کسی در دفتر نیست"
-            hint="هنوز کسی نیست"
             action={<Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور جدید</Btn>}
           />
         ) : q.trim() !== "" ? (
@@ -151,7 +150,6 @@ export default function Parties() {
         ) : (
           <Empty
             title={filter === "owes" ? "همه تسویه کرده‌اند" : "بدهی چیزی نیست"}
-            hint={filter === "owes" ? "کسی طلبی ندارد." : "به کسی بدهکار نیستی."}
           />
         )}
       </Body>

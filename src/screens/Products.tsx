@@ -95,7 +95,7 @@ export default function Products() {
         />
 
         {list.length === 0 ? (
-          <Empty title={q.trim() === "" ? "کالایی ثبت نشده" : "کالایی با این نام نیست"} />
+          q.trim() !== "" ? <Empty title="کالایی با این نام نیست" /> : null
         ) : (
           <>
             <div className="section-head pr-legend">

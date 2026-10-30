@@ -85,7 +85,7 @@ pub fn now_with(ctx: &Ctx<'_>, t: &dyn Transport) -> Res<BackupInfo> {
     let (sent, message) = if token.is_empty() || chat.is_empty() {
         (
             false,
-            "ربات تلگرام وصل نیست؛ نسخه پشتیبان روی گوشی ذخیره شد".to_string(),
+            "به تلگرام وصل نیست؛ پشتیبان روی گوشی ماند".to_string(),
         )
     } else {
         let file_name = archive
@@ -116,7 +116,7 @@ pub fn now_with(ctx: &Ctx<'_>, t: &dyn Transport) -> Res<BackupInfo> {
             }
             Err(_) => (
                 false,
-                "نسخه پشتیبان روی گوشی هست، ولی فرستادنش نشد".to_string(),
+                "پشتیبان ماند، ولی فرستادنش نشد".to_string(),
             ),
         }
     };

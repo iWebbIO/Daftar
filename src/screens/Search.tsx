@@ -107,7 +107,7 @@ export default function Search() {
 
         {!error && term.length < 2 && (
           <>
-            <Empty title="چه چیزی می‌خواهی پیدا کنی؟" />
+            <Empty title="نام یا مبلغ را بنویس" />
             <div className="sr-kinds">نام · کالا · مبلغ · یادداشت</div>
           </>
         )}

@@ -21,7 +21,7 @@ const CHROME = [
 const args = process.argv.slice(2);
 const sizeArg = args.find((a) => a.startsWith("--size="));
 const [w, h] = (sizeArg ? sizeArg.split("=")[1] : "390x844").split("x").map(Number);
-const query = args.find((a) => a.startsWith("--query="))?.split("=")[1] ?? "";
+const query = args.find((a) => a.startsWith("--query="))?.slice("--query=".length) ?? "";
 const names = args.filter((a) => !a.startsWith("--"));
 
 const ROUTES = names.length
