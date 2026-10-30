@@ -1,6 +1,6 @@
 [package]
 name = "daftar"
-version = "0.1.9"
+version = "0.1.0"
 description = "دفتر — دفتر حساب و سفارش فروشگاه"
 edition = "2021"
 rust-version = "1.82"
@@ -39,8 +39,10 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [profile.release]
-codegen-units = 1
-lto = true
+# Thin LTO and parallel codegen: a shop app of this size gains nothing from a
+# ten-minute link on every release, and CI has to finish before he can update.
+codegen-units = 16
+lto = "thin"
 opt-level = "s"
 panic = "abort"
 strip = true
