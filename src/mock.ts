@@ -289,7 +289,23 @@ function seed(): Store {
 
 let store: Store | null = null;
 function db(): Store {
-  if (!store) store = seed();
+  if (!store) {
+    store = seed();
+    // ?empty=1 is the moment he actually meets the app: a brand-new ledger.
+    if (new URLSearchParams(globalThis.location?.search ?? "").get("empty") === "1") {
+      store.parties = [];
+      store.products = [];
+      store.docs = [];
+      store.lines = {};
+      store.payments = [];
+      store.allocations = [];
+      store.cheques = [];
+      store.tasks = [];
+      store.notes = [];
+      store.sheets = [];
+      store.settings.lastBackupAt = null;
+    }
+  }
   return store;
 }
 

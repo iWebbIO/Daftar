@@ -191,8 +191,7 @@ export default function Today() {
 
         {view.docs.length === 0 && view.tasks.length === 0 && (
           <Empty
-            title="امروز هنوز چیزی ثبت نشده"
-            hint="با دکمه پایین یک فاکتور بساز."
+            title="امروز خالی است"
             action={
               <Btn onClick={() => nav.go({ name: "order", kind: "sale" })}>فاکتور جدید</Btn>
             }

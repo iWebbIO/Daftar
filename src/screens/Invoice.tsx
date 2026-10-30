@@ -96,7 +96,7 @@ export default function Invoice(props: { docId: number }) {
       // No share sheet here: the words are still worth having on the clipboard.
       try {
         await navigator.clipboard.writeText(text);
-        toast("متن فاکتور کپی شد؛ در پیام‌رسان بچسبان", "ok");
+        toast("متن کپی شد", "ok");
       } catch {
         toast("اشتراک‌گذاری روی این گوشی نیست", "bad");
       }
