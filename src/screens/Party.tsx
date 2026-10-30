@@ -59,6 +59,8 @@ export default function Party(props: { id: number }) {
   // sending the statement, two ways
   const [choosing, setChoosing] = useState(false);
   const [which, setWhich] = useState<"tg" | "share" | null>(null);
+  /** The statement on screen, when neither the sheet nor the clipboard works. */
+  const [manually, setManually] = useState<string | null>(null);
 
   const id = props.id;
 
@@ -171,7 +173,9 @@ export default function Party(props: { id: number }) {
         await navigator.clipboard.writeText(text);
         toast("متن کپی شد", "ok");
       } catch {
-        toast("اشتراک‌گذاری روی این گوشی نیست", "bad");
+        // Last resort, as on the invoice: put the words on screen so he can
+        // select and copy them himself rather than being told it cannot be done.
+        setManually(text);
       }
     }
     setWhich(null);
@@ -342,6 +346,16 @@ export default function Party(props: { id: number }) {
             )}
           </>
         )}
+      </Sheet>
+
+      <Sheet open={manually !== null} onClose={() => setManually(null)} title="متن صورت حساب">
+        <Field
+          label="این را بردار"
+          value={manually ?? ""}
+          onChange={(v) => setManually(v)}
+          multiline
+          rows={8}
+        />
       </Sheet>
 
       <Sheet open={choosing} onClose={() => setChoosing(false)} title="فرستادن صورت حساب">
