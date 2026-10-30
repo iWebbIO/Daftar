@@ -8,16 +8,10 @@
   letter-spacing: -0.01em;
 }
 
-.rp-note {
-  font-size: 11.5px;
-  color: var(--faint);
-  margin: 8px 4px 0;
-}
-
 /* -------------------------------------------------------- «چقدر فروختم؟» */
 
 .rp-hero {
-  padding: 16px 16px 6px;
+  padding: 15px 16px 4px;
 }
 
 .rp-hero__label {
@@ -26,13 +20,27 @@
 }
 
 .rp-hero__money {
-  margin: 0 0 10px;
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+
+.rp-hero__unit {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.rp-hero__foot {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-bottom: 8px;
 }
 
 .rp-lines {
   border-top: 1px solid var(--line);
-  padding-top: 6px;
+  padding-top: 4px;
 }
 
 .rp-line {
@@ -40,7 +48,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: 5px 0;
 }
 
 .rp-line__label {
@@ -58,15 +66,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 11px 14px;
 }
 
 .rp-age + .rp-age {
   border-top: 1px solid var(--line);
-}
-
-.rp-age.is-zero {
-  opacity: 0.55;
 }
 
 .rp-age__main {
@@ -128,28 +132,22 @@
 .rp-quiet {
   font-size: 13.5px;
   color: var(--muted);
-  line-height: 1.9;
   padding: 14px;
 }
 
 /* ------------------------------------- «چه چیزی بیشتر فروش داشته؟» */
 
+/* The money is the biggest thing in the row; the kilos are the aside. */
 .rp-prod {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 14px;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 54px;
 }
 
 .rp-prod + .rp-prod {
   border-top: 1px solid var(--line);
-}
-
-.rp-prod__rank {
-  flex: 0 0 16px;
-  font-size: 11.5px;
-  color: var(--faint);
-  text-align: center;
 }
 
 .rp-prod__main {
@@ -172,25 +170,37 @@
   margin-top: 1px;
 }
 
-.rp-prod__track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--surface-2);
-  margin-top: 6px;
-  overflow: hidden;
-}
-
-.rp-prod__fill {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--brand);
-  opacity: 0.45;
-}
-
 .rp-prod__money {
   flex: 0 0 auto;
-  font-size: 15.5px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--ink);
+}
+
+/* The rest of the ranking, one tap away. */
+.rp-more {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  color: var(--brand);
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.rp-more::before {
+  content: "";
+  position: absolute;
+  inset-inline: 14px;
+  top: 0;
+  height: 1px;
+  background: var(--line);
+}
+
+.rp-more:active {
+  background: var(--brand-soft);
 }

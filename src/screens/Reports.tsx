@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { fa, fmtAmount, fmtQty } from "../format";
+import { fa, currencyLabel, fmtAmount, fmtQty } from "../format";
 import { d2j, j2d, longDate, MONTHS, today, weekday } from "../jalali";
 import { useNav } from "../nav";
 import { Body, Card, Empty, Btn, Head, Loading, Money, Screen, Segmented } from "../ui/kit";
@@ -27,6 +27,7 @@ export default function Reports() {
   const [products, setProducts] = useState<ProductReport[] | null>(null);
   const [ageing, setAgeing] = useState<AgeBucket[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const range = useMemo(() => span(period), [period]);
 
@@ -91,8 +92,9 @@ export default function Reports() {
 
   const owed = ageing.reduce((n, b) => n + b.amount, 0);
   const debtors = ageing.reduce((n, b) => n + b.count, 0);
+  const live = ageing.filter((bucket) => bucket.amount > 0);
   const top = [...products].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-  const best = top.length > 0 ? top[0]!.revenue : 0;
+  const shown = showAll ? top : top.slice(0, 5);
 
   return (
     <Screen className="reports">
@@ -105,25 +107,24 @@ export default function Reports() {
         <Card className="rp-hero">
           <div className="rp-hero__label">فروش</div>
           <div className="rp-hero__money">
-            <Money value={sold} size="xl" unit />
+            <Money value={sold} size="xl" />
+            <span className="rp-hero__unit">{currencyLabel()}</span>
           </div>
+          <div className="rp-hero__foot">{count > 0 ? `${fa(count)} برگه` : "برگی نیست"}</div>
           <div className="rp-lines">
             <Line label="خرید" value={bought} tone="neg" />
             <Line label="دریافت" value={received} tone="pos" />
             <Line label="پرداخت" value={paid} tone="neg" />
           </div>
         </Card>
-        <div className="rp-note">
-          {count > 0 ? `${fa(count)} برگه در این بازه` : "در این بازه برگی ثبت نشده"}
-        </div>
 
         <div className="rp-q">کی پول من را نداده؟</div>
         <Card tight>
           {owed === 0 ? (
-            <div className="rp-quiet">همه حساب‌ها صفر است</div>
+            <div className="rp-quiet">طلبی نیست</div>
           ) : (
-            ageing.map((bucket) => (
-              <div className={`rp-age ${bucket.amount === 0 ? "is-zero" : ""}`} key={bucket.label}>
+            live.map((bucket) => (
+              <div className="rp-age" key={bucket.label}>
                 <div className="rp-age__main">
                   <div className="rp-age__label">{bucket.label}</div>
                   <div className="rp-age__count">{fa(bucket.count)} فاکتور</div>
@@ -149,28 +150,27 @@ export default function Reports() {
         <div className="rp-q">چه چیزی بیشتر فروش داشته؟</div>
         {top.length === 0 ? (
           <Card>
-            <div className="rp-quiet">چیزی فروخته نشده</div>
+            <div className="rp-quiet">فروشی نیست</div>
           </Card>
         ) : (
           <Card tight>
-            {top.map((p, i) => (
-              <div className="rp-prod" key={`${p.name}-${i}`}>
-                <span className="rp-prod__rank num">{fa(i + 1)}</span>
+            {shown.map((p) => (
+              <div className="rp-prod" key={`${p.name}-${p.productId ?? ""}`}>
                 <div className="rp-prod__main">
                   <div className="rp-prod__name">{p.name}</div>
                   <div className="rp-prod__qty">
                     <span className="num">{fmtQty(p.qtyMilli)}</span> {p.unit}
                   </div>
-                  <div className="rp-prod__track">
-                    <span
-                      className="rp-prod__fill"
-                      style={{ width: `${share(p.revenue, best)}%` }}
-                    />
-                  </div>
                 </div>
                 <div className="rp-prod__money num">{fmtAmount(p.revenue)}</div>
               </div>
             ))}
+            {shown.length < top.length && (
+              <button className="rp-more" onClick={() => setShowAll(true)}>
+                <span>بقیه</span>
+                <span className="num">{fa(top.length - shown.length)}</span>
+              </button>
+            )}
           </Card>
         )}
       </Body>
