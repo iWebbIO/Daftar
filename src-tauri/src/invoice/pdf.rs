@@ -12,7 +12,7 @@
 //! is written in font units and never has to think about it.
 
 use super::font::{self, Seg};
-use super::layout::{num, num_fine, Item, Page, PAGE_H, PAGE_W};
+use super::layout::{frame_bars, num, num_fine, Item, Page, PAGE_H, PAGE_W};
 
 /// Writes every page into one PDF file.
 pub fn render(pages: &[Page]) -> Vec<u8> {
@@ -133,22 +133,33 @@ fn content(page: &Page) -> String {
             }
             Item::Rule(rule) => {
                 let half = (rule.width / 2.0).max(0.1);
-                let top = PAGE_H - (rule.y - half);
-                let bottom = PAGE_H - (rule.y + half);
-                out.push_str(&format!("{} g\n", num(rule.shade)));
-                out.push_str(&format!(
-                    "{} {top} m {} {top} l {} {bottom} l {} {bottom} l h\nf\n",
-                    num(rule.x0),
-                    num(rule.x1),
-                    num(rule.x1),
-                    num(rule.x0),
-                ));
+                bar(&mut out, rule.x0, rule.y - half, rule.x1, rule.y + half, rule.shade);
+            }
+            Item::Frame(frame) => {
+                for (x0, y0, x1, y1) in frame_bars(frame) {
+                    bar(&mut out, x0, y0, x1, y1, frame.shade);
+                }
             }
         }
     }
 
     out.push_str("Q\n");
     out
+}
+
+/// One filled rectangle, as the four straight sides of a path. No `re` and no
+/// `S`: the sheet is made of fills, nothing else.
+fn bar(out: &mut String, x0: f32, y0: f32, x1: f32, y1: f32, shade: f32) {
+    let top = PAGE_H - y0;
+    let bottom = PAGE_H - y1;
+    out.push_str(&format!("{} g\n", num(shade)));
+    out.push_str(&format!(
+        "{} {top} m {} {top} l {} {bottom} l {} {bottom} l h\nf\n",
+        num(x0),
+        num(x1),
+        num(x1),
+        num(x0),
+    ));
 }
 
 /// The outline with PDF's path operators. Quadratic curves — which is all a

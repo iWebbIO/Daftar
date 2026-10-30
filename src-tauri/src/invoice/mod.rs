@@ -120,7 +120,39 @@ fn shop(conn: &Connection) -> layout::Shop {
         phone: s.shop_phone,
         address: s.shop_address,
         note: s.invoice_note,
+        bank: s.bank_name,
+        card_holder: s.card_holder,
+        card_number: s.card_number,
     }
+}
+
+/// How the money on this document was paid, in the words the invoice prints:
+/// «نقدی», «کارت به کارت», «چک», or a combination. Nothing paid yet reads as
+/// cash, which is what a shopkeeper writing an unsettled فاکتور means.
+fn payment_method(conn: &Connection, doc_id: i64) -> String {
+    let mut stmt = match conn.prepare(
+        "SELECT DISTINCT pm.method FROM payment pm
+         JOIN allocation a ON a.payment_id = pm.id
+         WHERE a.doc_id = ?1 AND pm.voided = 0",
+    ) {
+        Ok(stmt) => stmt,
+        Err(_) => return "نقدی".to_string(),
+    };
+    let methods = stmt
+        .query_map([doc_id], |r| r.get::<_, String>(0))
+        .map(|rows| rows.filter_map(Result::ok).collect::<Vec<_>>())
+        .unwrap_or_default();
+    if methods.is_empty() {
+        return "نقدی".to_string();
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for method in methods {
+        let said = method_fa(&method).to_string();
+        if !parts.contains(&said) {
+            parts.push(said);
+        }
+    }
+    parts.join(" و ")
 }
 
 fn load_party(conn: &Connection, party_id: i64) -> Res<Party> {
@@ -166,6 +198,8 @@ fn load_invoice(conn: &Connection, doc_id: i64) -> Res<layout::InvoiceData> {
         day: doc.day,
         status: doc.status,
         party_name: party.name,
+        party_phone: party.phone.unwrap_or_default(),
+        payment_method: payment_method(conn, doc_id),
         discount: doc.discount,
         rounding: doc.rounding,
         total: doc.total,
@@ -716,15 +750,15 @@ mod tests {
         let pages = layout::invoice_pages(&data);
         // The cancelled line keeps its row and its place in the numbering.
         assert_eq!(baselines(&pages, Class::Row).len(), 3);
-        // A strike is the one thin rule that starts inside the sheet and still
-        // reaches the right margin; the totals dividers stop at the label
-        // column.
+        // A strike is the one thin rule that reaches the right margin; the
+        // totals dividers stop at the label column and the table foot is
+        // heavier.
         let strikes = pages
             .iter()
             .flat_map(|page| page.items.iter())
             .filter(|item| {
                 matches!(item, Item::Rule(rule)
-                    if rule.width == 0.5 && rule.x0 > 100.0 && (rule.x1 - 386.0).abs() < 0.01)
+                    if rule.width == 0.5 && (rule.x1 - 386.0).abs() < 0.01)
             })
             .count();
         assert_eq!(strikes, 1, "one struck-through line, one strike");

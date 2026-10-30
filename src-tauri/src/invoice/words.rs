@@ -193,4 +193,5 @@ mod tests {
     fn a_debt_is_said_as_a_negative() {
         assert_eq!(words(-2_500), "منفی دو هزار و پانصد");
         assert_eq!(toman(1_862_000), "یک میلیون و هشتصد و شصت و دو هزار تومان");
-   
+    }
+}

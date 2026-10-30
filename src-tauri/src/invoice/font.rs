@@ -64,12 +64,16 @@ pub struct Typeset {
 /// Shapes `text` at `size` points and returns the glyphs in **visual** order:
 /// left to right, whatever direction the run itself runs in.
 ///
+/// `tabular` turns on the font's equal-width figures, which is what makes a
+/// column of money line up. It is off for prose — a phone number set in tabular
+/// figures looks as if it had been typed with spaces between the digits.
+///
 /// rustybuzz hands a right-to-left run back in reverse logical order — the test
 /// `right_to_left_glyphs_arrive_in_visual_order` in this module is the
 /// documentation for that. Rather than trust it blindly, the order is detected
 /// from the cluster indices and the offsets are computed accordingly, so a
 /// change of behaviour in the dependency would still draw the right thing.
-pub fn typeset(text: &str, size: f32, weight: Weight, dir: Dir) -> Typeset {
+pub fn typeset(text: &str, size: f32, weight: Weight, dir: Dir, tabular: bool) -> Typeset {
     if text.is_empty() || size <= 0.0 {
         return Typeset::default();
     }
@@ -85,13 +89,16 @@ pub fn typeset(text: &str, size: f32, weight: Weight, dir: Dir) -> Typeset {
         Dir::Ltr => rustybuzz::Direction::LeftToRight,
     });
 
-    // Tabular figures: every digit the same width, so columns of money line up.
-    let features = [rustybuzz::Feature::new(
-        rustybuzz::ttf_parser::Tag::from_bytes(b"tnum"),
-        1,
-        ..,
-    )];
-    let shaped = rustybuzz::shape(&face, &features, buffer);
+    let features: &[rustybuzz::Feature] = if tabular {
+        &[rustybuzz::Feature::new(
+            rustybuzz::ttf_parser::Tag::from_bytes(b"tnum"),
+            1,
+            ..,
+        )]
+    } else {
+        &[]
+    };
+    let shaped = rustybuzz::shape(&face, features, buffer);
     let infos = shaped.glyph_infos();
     let positions = shaped.glyph_positions();
     if infos.is_empty() {

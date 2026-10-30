@@ -14,6 +14,7 @@
 
 use super::bidi::Dir;
 use super::font::{self, Glyph, Weight};
+use super::words;
 use crate::jalali;
 use crate::money::{fa_digits, fmt_amount, fmt_qty};
 
@@ -35,15 +36,63 @@ const INK_FAINT: f32 = 0.56;
 const RULE: f32 = 0.74;
 const RULE_STRONG: f32 = 0.50;
 
-/// Invoice table columns, given as the right edge of each column: a Persian
-/// sheet is read right to left, so «ردیف» sits hard against the right margin
-/// and «جمع» ends up on the left.
-const COL_POS: f32 = 386.0;
-const COL_NAME: f32 = 358.0;
-const COL_QTY: f32 = 220.0;
-const COL_PRICE: f32 = 166.0;
-const COL_TOTAL: f32 = 108.0;
-const COL_GAP: f32 = 10.0;
+/// The invoice table's columns, worked out from the margins rather than written
+/// down as a list of numbers: the paper is read right to left, so «ردیف» sits
+/// hard against the right margin and «قیمت کل» ends up on the left.
+#[derive(Clone, Copy, Debug)]
+struct Grid {
+    pos: f32,
+    title: f32,
+    qty: f32,
+    unit: f32,
+    price: f32,
+    /// Present only when some line actually carries a discount.
+    discount: Option<f32>,
+    total: f32,
+    /// How much room the description has before it has to be trimmed.
+    title_width: f32,
+}
+
+impl Grid {
+    const GAP: f32 = 6.0;
+
+    fn new(with_discount: bool) -> Grid {
+        const POS_W: f32 = 22.0;
+        const QTY_W: f32 = 36.0;
+        const UNIT_W: f32 = 30.0;
+        const PRICE_W: f32 = 52.0;
+        const DISC_W: f32 = 34.0;
+        const TOTAL_W: f32 = 62.0;
+
+        let total = LEFT + TOTAL_W;
+        let mut left = total + Self::GAP;
+        let discount = if with_discount {
+            let right = left + DISC_W;
+            left = right + Self::GAP;
+            Some(right)
+        } else {
+            None
+        };
+        let price = left + PRICE_W;
+        left = price + Self::GAP;
+        let unit = left + UNIT_W;
+        left = unit + Self::GAP;
+        let qty = left + QTY_W;
+        left = qty + Self::GAP;
+        let title = RIGHT - POS_W - Self::GAP;
+
+        Grid {
+            pos: RIGHT,
+            title,
+            qty,
+            unit,
+            price,
+            discount,
+            total,
+            title_width: title - left,
+        }
+    }
+}
 
 /// Statement columns.
 const S_DATE: f32 = 386.0;
@@ -55,6 +104,9 @@ const S_REST: f32 = 112.0;
 /// number — what is still owed — is the one the customer must not miss.
 const TOT_LABEL: f32 = 224.0;
 const TOT_AMOUNT: f32 = 148.0;
+
+/// The card box sits opposite the totals, on the right of an RTL sheet.
+const CARD_LEFT: f32 = 236.0;
 
 /// Which part of the page a run belongs to. It is written into the SVG as a
 /// data attribute, which makes the file readable by eye and lets the tests ask
@@ -110,10 +162,34 @@ pub struct Rule {
     pub shade: f32,
 }
 
+/// A rectangle drawn as four thin bars — the card box. A frame, not a box: one
+/// hairline, no fill, so a sheet that is otherwise all rules stays quiet.
+#[derive(Clone, Copy, Debug)]
+pub struct Frame {
+    pub x0: f32,
+    pub y0: f32,
+    pub x1: f32,
+    pub y1: f32,
+    pub width: f32,
+    pub shade: f32,
+}
+
+/// The four bars a frame is made of, as `(x0, y0, x1, y1)`.
+pub fn frame_bars(frame: &Frame) -> [(f32, f32, f32, f32); 4] {
+    let w = frame.width;
+    [
+        (frame.x0, frame.y0, frame.x1, frame.y0 + w),
+        (frame.x0, frame.y1 - w, frame.x1, frame.y1),
+        (frame.x0, frame.y0, frame.x0 + w, frame.y1),
+        (frame.x1 - w, frame.y0, frame.x1, frame.y1),
+    ]
+}
+
 #[derive(Clone, Debug)]
 pub enum Item {
     Text(Text),
     Rule(Rule),
+    Frame(Frame),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -128,6 +204,17 @@ impl Page {
 
     pub fn rule(&mut self, x0: f32, x1: f32, y: f32, width: f32, shade: f32) {
         self.items.push(Item::Rule(Rule { x0, x1, y, width, shade }));
+    }
+
+    pub fn frame(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, width: f32, shade: f32) {
+        self.items.push(Item::Frame(Frame {
+            x0,
+            y0,
+            x1,
+            y1,
+            width,
+            shade,
+        }));
     }
 }
 
@@ -314,13 +401,17 @@ fn unit_fa(unit: &str) -> String {
     }
 }
 
-/// The shop as it appears at the top of every page.
+/// The shop as it appears at the top of every page, and the card the customer
+/// pays into when the shopkeeper has filled one in.
 #[derive(Clone, Debug, Default)]
 pub struct Shop {
     pub name: String,
     pub phone: String,
     pub address: String,
     pub note: String,
+    pub bank: String,
+    pub card_holder: String,
+    pub card_number: String,
 }
 
 /// A page under construction, with the pen moving down it.
@@ -422,6 +513,10 @@ pub struct InvoiceData {
     pub day: i64,
     pub status: String,
     pub party_name: String,
+    pub party_phone: String,
+    /// How the money that has already come in was paid: «نقدی», «کارت به
+    /// کارت», «چک», or a combination.
+    pub payment_method: String,
     pub discount: i64,
     pub rounding: i64,
     pub total: i64,
@@ -435,6 +530,22 @@ impl InvoiceData {
     fn is_sale(&self) -> bool {
         self.kind != "purchase"
     }
+
+    /// Whether any line was sold for less than quantity times price, which is
+    /// the only kind of line discount the database can hold. When there is one,
+    /// the table grows a «تخفیف» column.
+    fn has_line_discount(&self) -> bool {
+        self.lines.iter().any(|line| line.discount() > 0)
+    }
+}
+
+impl LineData {
+    /// What the line would cost at its own price, and what it was actually
+    /// charged: the difference is the line's discount.
+    fn discount(&self) -> i64 {
+        let computed = self.qty_milli.saturating_mul(self.price) / 1000;
+        (computed - self.total).max(0)
+    }
 }
 
 /// The invoice for one document, as one or more finished pages.
@@ -443,42 +554,58 @@ pub fn invoice_pages(data: &InvoiceData) -> Vec<Page> {
     let sale = data.is_sale();
     masthead(&mut sheet, &data.shop);
 
-    // The title, with the document number tucked in beside it.
     let title = if sale {
         "فاکتور فروش".to_string()
     } else {
         format!("خرید از {}", data.party_name.trim())
     };
-    let title = fit(&title, 13.5, Weight::Bold, 158.0);
-    let title_width = measure(&title, 13.5, Weight::Bold);
+    let title = fit(&title, 13.5, Weight::Bold, 200.0);
     sheet
         .page
-        .push(line(&title, 13.5, Weight::Bold).class(Class::Title).at(96.0).right(RIGHT));
-    let number = format!("شماره {}", fa_digits(&data.number.to_string()));
-    sheet.page.push(
-        line(&number, 9.0, Weight::Regular)
-            .class(Class::Meta)
-            .shade(INK_SOFT)
-            .at(96.0)
-            .right(RIGHT - title_width - 9.0),
-    );
+        .push(line(&title, 13.5, Weight::Bold).class(Class::Title).at(90.0).right(RIGHT));
 
-    // The date belongs where the eye expects it on a Persian invoice: top left.
-    sheet.page.push(
-        line(&jalali::long(data.day), 9.0, Weight::Regular)
-            .class(Class::Meta)
-            .shade(INK_SOFT)
-            .at(96.0)
-            .right(200.0),
-    );
+    // The facts a customer checks first. They live on the left of the title,
+    // the party on the right of them, and the two columns share four lines.
+    invoice_facts(&mut sheet, data, sale);
+    sheet.page.rule(LEFT, RIGHT, 158.0, 0.4, 0.87);
 
-    if sale {
-        let who = format!("خریدار: {}", data.party_name.trim());
+    invoice_table(&mut sheet, data, sale);
+    invoice_money(&mut sheet, data, sale);
+    invoice_note(&mut sheet, data);
+
+    let mut pages = sheet.finish();
+    stamp_footer(&mut pages, &data.shop.note);
+    pages
+}
+
+/// `شماره فاکتور` / `تاریخ` / `وضعیت فاکتور` / `نوع پرداخت` on the left, and who
+/// the invoice is for on the right.
+fn invoice_facts(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
+    const FACTS: f32 = 200.0;
+    let settled = if data.remaining > 0 {
+        "تسویه نشده"
+    } else {
+        "تسویه شده"
+    };
+    let method = if data.payment_method.trim().is_empty() {
+        "نقدی"
+    } else {
+        data.payment_method.trim()
+    };
+
+    let facts = [
+        format!("شماره فاکتور: {}", fa_digits(&data.number.to_string())),
+        format!("تاریخ: {}", jalali::long(data.day)),
+        format!("وضعیت فاکتور: {settled}"),
+        format!("نوع پرداخت: {method}"),
+    ];
+    for (i, fact) in facts.iter().enumerate() {
         sheet.page.push(
-            line(&fit(&who, 10.5, Weight::Regular, 260.0), 10.5, Weight::Regular)
-                .class(Class::Party)
-                .at(118.0)
-                .right(RIGHT),
+            line(&fit(fact, 9.0, Weight::Regular, FACTS - LEFT), 9.0, Weight::Regular)
+                .class(Class::Meta)
+                .shade(INK_SOFT)
+                .at(108.0 + i as f32 * 13.0)
+                .right(FACTS),
         );
     }
 
@@ -489,29 +616,48 @@ pub fn invoice_pages(data: &InvoiceData) -> Vec<Page> {
             line("باطل شده", 9.5, Weight::Medium)
                 .class(Class::Meta)
                 .shade(0.35)
-                .at(118.0)
-                .right(200.0),
+                .at(160.0)
+                .right(RIGHT),
         );
     }
-    sheet.page.rule(LEFT, RIGHT, 129.0, 0.4, 0.87);
 
-    invoice_table(&mut sheet, data, sale);
-    invoice_totals(&mut sheet, data, sale);
-    invoice_note(&mut sheet, data);
-
-    let mut pages = sheet.finish();
-    stamp_footer(&mut pages, &data.shop.note);
-    pages
+    let who = if sale {
+        format!("مشتری: {}", data.party_name.trim())
+    } else {
+        format!("فروشنده: {}", data.party_name.trim())
+    };
+    sheet.page.push(
+        line(&fit(&who, 10.5, Weight::Regular, 250.0), 10.5, Weight::Regular)
+            .class(Class::Party)
+            .at(108.0)
+            .right(RIGHT),
+    );
+    if !data.party_phone.trim().is_empty() {
+        let phone = format!("شماره تماس: {}", data.party_phone.trim());
+        sheet.page.push(
+            line(&fit(&phone, 9.0, Weight::Regular, 250.0), 9.0, Weight::Regular)
+                .class(Class::Party)
+                .shade(INK_SOFT)
+                .at(121.0)
+                .right(RIGHT),
+        );
+    }
 }
 
-fn invoice_head(page: &mut Page, baseline: f32) {
-    for (label, x) in [
-        ("ردیف", COL_POS),
-        ("شرح کالا", COL_NAME),
-        ("مقدار", COL_QTY),
-        ("فی", COL_PRICE),
-        ("جمع", COL_TOTAL),
-    ] {
+fn invoice_head(page: &mut Page, baseline: f32, grid: Grid) {
+    let mut columns = vec![
+        ("ردیف", grid.pos),
+        ("عنوان", grid.title),
+        ("مقدار", grid.qty),
+        ("واحد", grid.unit),
+        ("قیمت واحد", grid.price),
+    ];
+    if let Some(discount) = grid.discount {
+        columns.push(("تخفیف", discount));
+    }
+    columns.push(("قیمت کل", grid.total));
+
+    for (label, x) in columns {
         page.push(
             line(label, 8.0, Weight::Medium)
                 .class(Class::Head)
@@ -525,6 +671,7 @@ fn invoice_head(page: &mut Page, baseline: f32) {
 /// What a continued invoice looks like: the shop, the number, and the columns
 /// again, so page two can be read on its own.
 fn invoice_continuation(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
+    let grid = Grid::new(data.has_line_discount());
     let name = data.shop.name.trim();
     if !name.is_empty() {
         sheet.page.push(
@@ -545,17 +692,18 @@ fn invoice_continuation(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
             .right(RIGHT),
     );
     sheet.page.rule(LEFT, RIGHT, 62.0, 0.6, RULE);
-    invoice_head(&mut sheet.page, 78.0);
+    invoice_head(&mut sheet.page, 78.0, grid);
     sheet.page.rule(LEFT, RIGHT, 84.0, 0.8, RULE_STRONG);
     sheet.y = 99.0;
 }
 
-const ROW_STEP: f32 = 17.5;
+const ROW_STEP: f32 = 17.0;
 
 fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
-    invoice_head(&mut sheet.page, 146.0);
-    sheet.page.rule(LEFT, RIGHT, 152.0, 0.8, RULE_STRONG);
-    sheet.y = 167.0;
+    let grid = Grid::new(data.has_line_discount());
+    invoice_head(&mut sheet.page, 172.0, grid);
+    sheet.page.rule(LEFT, RIGHT, 178.0, 0.8, RULE_STRONG);
+    sheet.y = 194.0;
 
     if data.lines.is_empty() {
         sheet.page.push(
@@ -563,7 +711,7 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
                 .class(Class::Row)
                 .shade(INK_FAINT)
                 .at(sheet.y)
-                .right(COL_NAME),
+                .right(grid.title),
         );
         sheet.y += ROW_STEP;
     }
@@ -582,51 +730,63 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
             i as i64 + 1
         };
         let pen = if item.voided { 0.46 } else { INK_FAINT };
-        sheet
-            .page
-            .push(line(&fa_digits(&index.to_string()), 8.5, Weight::Regular)
+        sheet.page.push(
+            line(&fa_digits(&index.to_string()), 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(pen)
                 .at(y)
-                .right(COL_POS));
+                .right(grid.pos),
+        );
 
-        let name = fit(&item.name, 9.0, Weight::Regular, COL_NAME - COL_QTY - COL_GAP);
+        let name = fit(&item.name, 9.0, Weight::Regular, grid.title_width);
         sheet.page.push(
             line(&name, 9.0, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
-                .right(COL_NAME),
+                .right(grid.title),
         );
 
-        let unit = unit_fa(&item.unit);
-        let qty = if unit.is_empty() {
-            fmt_qty(item.qty_milli)
-        } else {
-            format!("{} {}", fmt_qty(item.qty_milli), unit)
-        };
-        let qty = fit(&qty, 8.5, Weight::Regular, COL_QTY - COL_PRICE - COL_GAP);
+        // Quantity and unit are their own columns: «۱۵» then «کیلو», which is
+        // how a Persian invoice reads.
+        let qty = fmt_qty(item.qty_milli);
         sheet.page.push(
             line(&qty, 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
-                .right(COL_QTY),
+                .right(grid.qty),
+        );
+        let unit = fit(&unit_fa(&item.unit), 8.5, Weight::Regular, 30.0);
+        sheet.page.push(
+            line(&unit, 8.5, Weight::Regular)
+                .class(Class::Row)
+                .shade(ink)
+                .at(y)
+                .right(grid.unit),
         );
 
-        let price = fit(
-            &fmt_amount(item.price),
-            8.5,
-            Weight::Regular,
-            COL_PRICE - COL_TOTAL - COL_GAP,
-        );
+        let price = fit(&fmt_amount(item.price), 8.5, Weight::Regular, 52.0);
         sheet.page.push(
             line(&price, 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
-                .right(COL_PRICE),
+                .right(grid.price),
         );
+
+        if let Some(column) = grid.discount {
+            let discount = item.discount();
+            if discount > 0 {
+                sheet.page.push(
+                    line(&fmt_amount(discount), 8.5, Weight::Regular)
+                        .class(Class::Row)
+                        .shade(ink)
+                        .at(y)
+                        .right(column),
+                );
+            }
+        }
 
         // A cancelled line keeps its place on the sheet and says so, rather
         // than quietly vanishing and leaving a gap in the numbering.
@@ -635,19 +795,19 @@ fn invoice_table(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         } else {
             fmt_amount(item.total)
         };
-        let total = fit(&total, 8.5, Weight::Regular, COL_TOTAL - LEFT);
+        let total = fit(&total, 8.5, Weight::Regular, 62.0);
         sheet.page.push(
             line(&total, 8.5, Weight::Regular)
                 .class(Class::Row)
                 .shade(ink)
                 .at(y)
-                .right(COL_TOTAL),
+                .right(grid.total),
         );
 
         if item.voided {
-            // Struck from the row number to the price, so the words «خط خورده»
-            // in the last column stay readable.
-            sheet.page.rule(COL_TOTAL, RIGHT, y - 3.0, 0.5, 0.46);
+            // Struck from the row number to the last price column, so the
+            // words «خط خورده» stay readable.
+            sheet.page.rule(grid.total, RIGHT, y - 3.0, 0.5, 0.46);
         }
         // The last row's line is the foot of the table, so it is drawn as an
         // edge rather than as another hairline.
@@ -692,28 +852,48 @@ fn tot_line(
     }
 }
 
-fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
-    if !sheet.has_room(150.0) {
+/// The bottom of the sheet: what the goods came to, what came off, what was
+/// paid, what is left — and, beside it, where the money can be sent.
+fn invoice_money(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
+    if !sheet.has_room(196.0) {
         sheet.page_break();
         invoice_continuation(sheet, data, sale);
     }
 
-    // The block is one column: every rule in it runs from the left margin to
-    // just past the labels, so the whole thing reads as one sum instead of
-    // three unrelated fragments.
-    let base = sheet.y + 12.0;
+    let band = sheet.y + 12.0;
+    let totals = invoice_totals(sheet, data, band);
+    let card = card_box(sheet, &data.shop, band);
+    let floor = totals.max(card);
+
+    // مبلغ به حروف — the total said in words, the way every printed Iranian
+    // فاکتور closes its figures.
+    let said = words::toman(data.total);
+    let text = format!("مبلغ به حروف: {said}");
+    sheet.page.push(
+        line(&fit(&text, 8.6, Weight::Regular, RIGHT - LEFT), 8.6, Weight::Regular)
+            .class(Class::Total)
+            .shade(0.28)
+            .at(floor + 16.0)
+            .right(RIGHT),
+    );
+    sheet.y = floor + 16.0;
+}
+
+/// The totals column. Its rules all run from the left margin to just past the
+/// labels, so the block reads as one sum instead of three fragments.
+fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, base: f32) -> f32 {
     sheet.page.rule(LEFT, TOT_LABEL, base, 0.8, RULE_STRONG);
 
-    // The lines add up in public: what the goods came to, then what was taken
-    // off, then what the total was rounded by.
-    let gross = data.total + data.discount - data.rounding;
+    // What the lines added up to before the document discount, which is what
+    // the «قیمت کل» column of the table adds up to as well.
+    let items = data.total + data.discount - data.rounding;
     let mut y = base + 18.0;
     let mut last = y;
 
     tot_line(
         &mut sheet.page,
-        "جمع کل",
-        &fmt_amount(gross),
+        "جمع آیتم‌ها",
+        &fmt_amount(items),
         y,
         9.5,
         Weight::Regular,
@@ -721,9 +901,15 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
     );
     if data.discount != 0 {
         y += 13.5;
+        // A discount that is a whole percentage of the sum says so, the way the
+        // samples print «تخفیف: ۲٪».
+        let label = match percent_of(data.discount, items) {
+            Some(pct) => format!("تخفیف {}٪", fa_digits(&pct.to_string())),
+            None => "تخفیف".to_string(),
+        };
         tot_line(
             &mut sheet.page,
-            "تخفیف",
+            &label,
             &fmt_amount(-data.discount),
             y,
             8.8,
@@ -746,17 +932,16 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
         last = y;
     }
 
-    // Air, a divider, air: a new group — the total and what has been paid
-    // against it.
+    // Air, a divider, air: a new group — the total itself.
     y = last + 12.0;
     sheet.page.rule(LEFT, TOT_LABEL, y, 0.5, RULE_STRONG);
     y += 20.0;
     tot_line(
         &mut sheet.page,
-        "مبلغ نهایی",
+        "جمع کل",
         &fmt_amount(data.total),
         y,
-        11.5,
+        12.5,
         Weight::Bold,
         INK,
     );
@@ -776,8 +961,7 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
     }
 
     if data.remaining == 0 && data.paid == 0 {
-        sheet.y = last + 6.0;
-        return;
+        return last + 6.0;
     }
 
     // The one number the customer must not miss, after its own break.
@@ -805,7 +989,82 @@ fn invoice_totals(sheet: &mut Sheet, data: &InvoiceData, sale: bool) {
             INK_SOFT,
         );
     }
-    sheet.y = y + 4.0;
+    y + 4.0
+}
+
+/// A discount that is a whole number of percent of `whole`, if it is one.
+fn percent_of(discount: i64, whole: i64) -> Option<i64> {
+    if whole <= 0 || discount <= 0 || discount > whole {
+        return None;
+    }
+    if (discount * 100) % whole == 0 {
+        Some(discount * 100 / whole)
+    } else {
+        None
+    }
+}
+
+/// The card the customer pays into. Drawn only when the shopkeeper has filled
+/// one in; otherwise the space simply stays part of the totals.
+fn card_box(sheet: &mut Sheet, shop: &Shop, top: f32) -> f32 {
+    let bank = shop.bank.trim();
+    let holder = shop.card_holder.trim();
+    let number = shop.card_number.trim();
+    if bank.is_empty() && holder.is_empty() && number.is_empty() {
+        return top;
+    }
+
+    const PAD: f32 = 9.0;
+    let mut rows: Vec<(String, f32, Weight, f32)> = Vec::new();
+    if !bank.is_empty() {
+        rows.push((bank.to_string(), 8.6, Weight::Medium, INK));
+    }
+    if !holder.is_empty() {
+        rows.push((
+            format!("صاحب حساب: {holder}"),
+            8.2,
+            Weight::Regular,
+            INK_SOFT,
+        ));
+    }
+    if !number.is_empty() {
+        rows.push(("شماره کارت:".to_string(), 8.2, Weight::Regular, INK_SOFT));
+        rows.push((card_groups(number), 9.0, Weight::Medium, INK));
+    }
+    if rows.is_empty() {
+        return top;
+    }
+
+    let inner = RIGHT - CARD_LEFT - PAD * 2.0;
+    let mut y = top + PAD + 8.0;
+    for (text, size, weight, shade) in &rows {
+        sheet.page.push(
+            line(&fit(text, *size, *weight, inner), *size, *weight)
+                .class(Class::Note)
+                .shade(*shade)
+                .at(y)
+                .right(RIGHT - PAD),
+        );
+        y += 12.0;
+    }
+    let bottom = y - 12.0 + PAD;
+    sheet.page.frame(CARD_LEFT, top, RIGHT, bottom, 0.4, 0.78);
+    bottom
+}
+
+/// A card number in groups of four, as it is printed on the card. The digits
+/// stay Latin on purpose — that is how a customer reads them out loud.
+fn card_groups(number: &str) -> String {
+    let digits: String = number.chars().filter(char::is_ascii_digit).collect();
+    if digits.len() != 16 {
+        return number.trim().to_string();
+    }
+    digits
+        .as_bytes()
+        .chunks(4)
+        .map(|chunk| std::str::from_utf8(chunk).unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join(" - ")
 }
 
 fn invoice_note(sheet: &mut Sheet, data: &InvoiceData) {
@@ -909,7 +1168,7 @@ pub fn statement_pages(data: &StatementData) -> Vec<Page> {
                 .at(y)
                 .right(S_DATE),
         );
-        let title = fit(&item.title, 8.8, Weight::Regular, S_TITLE - S_AMOUNT - COL_GAP);
+        let title = fit(&item.title, 8.8, Weight::Regular, S_TITLE - S_AMOUNT - Grid::GAP);
         sheet.page.push(
             line(&title, 8.8, Weight::Regular)
                 .class(Class::Row)
@@ -1036,20 +1295,21 @@ fn stamp_footer(pages: &mut [Page], note: &str) {
                     .right(RIGHT),
             );
         }
-        if count > 1 {
-            let label = format!(
-                "صفحه {} از {}",
-                fa_digits(&(i + 1).to_string()),
-                fa_digits(&count.to_string())
-            );
-            page.push(
-                line(&label, 7.6, Weight::Regular)
-                    .class(Class::Note)
-                    .shade(0.55)
-                    .at(FOOTER)
-                    .left(LEFT),
-            );
-        }
+        // Every sheet says where it sits in the document, even when there is
+        // only one, because a statement that spans three pages needs it and a
+        // page that says «۱ از ۱» was never mislaid.
+        let label = format!(
+            "صفحه {} از {}",
+            fa_digits(&(i + 1).to_string()),
+            fa_digits(&count.to_string())
+        );
+        page.push(
+            line(&label, 7.6, Weight::Regular)
+                .class(Class::Note)
+                .shade(0.55)
+                .at(FOOTER)
+                .left(LEFT),
+        );
     }
 }
 

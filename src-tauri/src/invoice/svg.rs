@@ -6,7 +6,7 @@
 //! viewer to get wrong.
 
 use super::font::{self, Seg};
-use super::layout::{num, num_fine, Item, Page, PAGE_H, PAGE_W};
+use super::layout::{frame_bars, num, num_fine, Item, Page, PAGE_H, PAGE_W};
 
 /// The air between one page and the next when a preview shows several.
 const GAP: f32 = 22.0;
@@ -34,14 +34,18 @@ pub fn render(pages: &[Page]) -> String {
         ));
         for item in &page.items {
             match item {
-                Item::Rule(rule) => out.push_str(&format!(
-                    r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}"/>"#,
-                    num(rule.x0),
-                    num(rule.y - rule.width / 2.0),
-                    num(rule.x1 - rule.x0),
-                    num(rule.width.max(0.2)),
-                    hex(rule.shade),
+                Item::Rule(rule) => out.push_str(&bar(
+                    rule.x0,
+                    rule.y - rule.width / 2.0,
+                    rule.x1,
+                    rule.y + rule.width / 2.0,
+                    rule.shade,
                 )),
+                Item::Frame(frame) => {
+                    for (x0, y0, x1, y1) in frame_bars(frame) {
+                        out.push_str(&bar(x0, y0, x1, y1, frame.shade));
+                    }
+                }
                 Item::Text(text) => {
                     if text.glyphs.is_empty() {
                         continue;
@@ -114,4 +118,16 @@ pub fn path_data(segs: &[Seg]) -> String {
 pub fn hex(shade: f32) -> String {
     let v = (shade.clamp(0.0, 1.0) * 255.0).round() as u32;
     format!("#{v:02x}{v:02x}{v:02x}")
+}
+
+/// One filled rectangle — what both a rule and a bar of a frame are made of.
+fn bar(x0: f32, y0: f32, x1: f32, y1: f32, shade: f32) -> String {
+    format!(
+        r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}"/>"#,
+        num(x0),
+        num(y0),
+        num((x1 - x0).max(0.2)),
+        num((y1 - y0).max(0.2)),
+        hex(shade),
+    )
 }
