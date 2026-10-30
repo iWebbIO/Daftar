@@ -31,11 +31,41 @@
   color: var(--muted);
 }
 
+/* «همه» — the whole balance, typed in one tap. It sits with the amount because
+   that is the number it fills, and it is 52px of thumb like everything else. */
+.pay-all {
+  align-self: center;
+  min-height: var(--tap);
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 0.1s var(--ease), background 0.12s var(--ease);
+}
+.pay-all:active {
+  transform: scale(0.96);
+  background: var(--surface-2);
+}
+
 .pay-amount__num {
   font-size: 42px;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.2;
+  min-width: 0;
+}
+
+/* A big debt in rial is two digits longer than the same debt in toman: the
+   number steps down rather than being cut off. */
+.pay-amount__num.is-long {
+  font-size: 32px;
+}
+
+.pay-amount__num.is-xlong {
+  font-size: 26px;
+  letter-spacing: -0.02em;
 }
 
 .pay-amount__unit {

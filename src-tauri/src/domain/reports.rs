@@ -5,7 +5,7 @@
 //! «چقدر پول دست مردم مانده» (how much money is still out there).
 
 use crate::db::{self, Res};
-use crate::domain::products::{fail, normalise};
+use crate::domain::products::normalise;
 use crate::dto::{AgeBucket, ProductReport, ReportDays};
 use crate::Ctx;
 use rusqlite::{Connection, OptionalExtension};
@@ -33,7 +33,7 @@ pub fn days(conn: &Connection, from: i64, to: i64) -> Res<Vec<ReportDays>> {
                  WHERE d.status <> 'void' AND d.day BETWEEN ?1 AND ?2
                  GROUP BY d.day, d.kind",
             )
-            .map_err(|e| fail("گزارش روزها خوانده نشد", e))?;
+            .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?;
         let rows = stmt
             .query_map([from, to], |r| {
                 Ok((
@@ -43,9 +43,9 @@ pub fn days(conn: &Connection, from: i64, to: i64) -> Res<Vec<ReportDays>> {
                     r.get::<_, i64>(3)?,
                 ))
             })
-            .map_err(|e| fail("گزارش روزها خوانده نشد", e))?
+            .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| fail("گزارش روزها خوانده نشد", e))?;
+            .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?;
         for (day, kind, total, count) in rows {
             let entry = per_day.entry(day).or_insert(ReportDays {
                 day,
@@ -72,7 +72,7 @@ pub fn days(conn: &Connection, from: i64, to: i64) -> Res<Vec<ReportDays>> {
                  WHERE voided = 0 AND day BETWEEN ?1 AND ?2
                  GROUP BY day, direction",
             )
-            .map_err(|e| fail("گزارش روزها خوانده نشد", e))?;
+            .map_err(|e| db::oops("خواندن پرداخت‌ها نشد", e))?;
         let rows = stmt
             .query_map([from, to], |r| {
                 Ok((
@@ -81,9 +81,9 @@ pub fn days(conn: &Connection, from: i64, to: i64) -> Res<Vec<ReportDays>> {
                     r.get::<_, i64>(2)?,
                 ))
             })
-            .map_err(|e| fail("گزارش روزها خوانده نشد", e))?
+            .map_err(|e| db::oops("خواندن پرداخت‌ها نشد", e))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| fail("گزارش روزها خوانده نشد", e))?;
+            .map_err(|e| db::oops("خواندن پرداخت‌ها نشد", e))?;
         for (day, direction, amount) in rows {
             let entry = per_day.entry(day).or_insert(ReportDays {
                 day,
@@ -130,7 +130,7 @@ pub fn products(conn: &Connection, from: i64, to: i64) -> Res<Vec<ProductReport>
                AND d.day BETWEEN ?1 AND ?2
              ORDER BY d.day DESC, d.id DESC, l.pos DESC",
         )
-        .map_err(|e| fail("گزارش کالاها خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن سطرها نشد", e))?;
     let rows = stmt
         .query_map([from, to], |r| {
             Ok((
@@ -142,9 +142,9 @@ pub fn products(conn: &Connection, from: i64, to: i64) -> Res<Vec<ProductReport>
                 r.get::<_, i64>(5)?,
             ))
         })
-        .map_err(|e| fail("گزارش کالاها خوانده نشد", e))?
+        .map_err(|e| db::oops("خواندن سطرها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("گزارش کالاها خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن سطرها نشد", e))?;
 
     // A kilo and a piece never go in the same row, so the unit is part of the key.
     // Rows come newest first, so the first spelling seen is the one shown.
@@ -208,7 +208,7 @@ fn latest_sale_price(conn: &Connection, product_id: i64) -> Res<Option<i64>> {
         |r| r.get::<_, i64>(0),
     )
     .optional()
-    .map_err(|e| fail("آخرین قیمت خوانده نشد", e))
+    .map_err(|e| db::oops("خواندن قیمت‌ها نشد", e))
 }
 
 /// How long the money that is still out there has been waiting.
@@ -244,12 +244,12 @@ pub fn ageing(conn: &Connection) -> Res<Vec<AgeBucket>> {
              FROM doc d
              WHERE d.kind = 'sale' AND d.status <> 'void'",
         )
-        .map_err(|e| fail("گزارش بدهی‌ها خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?;
     let rows = stmt
         .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
-        .map_err(|e| fail("گزارش بدهی‌ها خوانده نشد", e))?
+        .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("گزارش بدهی‌ها خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?;
 
     for (day, remaining) in rows {
         if remaining <= 0 {
@@ -291,19 +291,19 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
             let (from, to) = range(&a);
             let conn = ctx.conn()?;
             let rows = days(&conn, from, to)?;
-            serde_json::to_value(rows).map_err(|e| fail("گزارش روزها ساخته نشد", e))
+            serde_json::to_value(rows).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         "reports.products" => (|| -> Res<Value> {
             let a: RangeArgs = serde_json::from_value(args.clone()).unwrap_or_default();
             let (from, to) = range(&a);
             let conn = ctx.conn()?;
             let rows = products(&conn, from, to)?;
-            serde_json::to_value(rows).map_err(|e| fail("گزارش کالاها ساخته نشد", e))
+            serde_json::to_value(rows).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         "reports.ageing" => (|| -> Res<Value> {
             let conn = ctx.conn()?;
             let rows = ageing(&conn)?;
-            serde_json::to_value(rows).map_err(|e| fail("گزارش بدهی‌ها ساخته نشد", e))
+            serde_json::to_value(rows).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         _ => return None,
     })

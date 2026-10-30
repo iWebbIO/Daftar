@@ -21,13 +21,6 @@ const HISTORY_MAX: usize = 40;
 /// How many of a customer's usual items the order screen offers.
 const USUAL_MAX: usize = 12;
 
-/// A short Persian sentence for the shopkeeper, with the technical detail kept
-/// on the developer's side of the fence.
-pub(crate) fn fail(what: &str, e: impl std::fmt::Display) -> String {
-    eprintln!("daftar · {what}: {e}");
-    what.to_string()
-}
-
 /// Persian text as it should be compared.
 ///
 /// Two people type the same word differently, and a phone keyboard adds its own
@@ -95,7 +88,7 @@ pub fn load(conn: &Connection, id: i64) -> Res<Product> {
         from_row,
     )
     .optional()
-    .map_err(|e| fail("کالا خوانده نشد", e))?
+    .map_err(|e| db::oops("خواندن کالا نشد", e))?
     .ok_or_else(|| "کالا پیدا نشد".to_string())
 }
 
@@ -107,12 +100,12 @@ fn by_name(conn: &Connection, name: &str) -> Res<Option<Product>> {
             "SELECT id, name, unit, sale_price, buy_price, active, created_at, updated_at
              FROM product",
         )
-        .map_err(|e| fail("کالا خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?;
     let all = stmt
         .query_map([], from_row)
-        .map_err(|e| fail("کالا خوانده نشد", e))?
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("کالا خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?;
     Ok(all.into_iter().find(|p| normalise(&p.name) == needle))
 }
 
@@ -126,12 +119,12 @@ pub fn list(conn: &Connection, q: Option<&str>) -> Res<Vec<Product>> {
                               WHERE ph.product_id = p.id), 0) AS used
              FROM product p",
         )
-        .map_err(|e| fail("فهرست کالاها خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?;
     let mut rows = stmt
         .query_map([], |r| Ok((from_row(r)?, r.get::<_, i64>(8)?)))
-        .map_err(|e| fail("فهرست کالاها خوانده نشد", e))?
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("فهرست کالاها خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?;
 
     let needle = q.map(normalise).unwrap_or_default();
     if !needle.is_empty() {
@@ -153,7 +146,7 @@ pub fn list(conn: &Connection, q: Option<&str>) -> Res<Vec<Product>> {
 pub fn save(conn: &Connection, input: &ProductInput) -> Res<Product> {
     let name = input.name.trim().to_string();
     if name.is_empty() {
-        return Err("نام کالا را بنویسید".to_string());
+        return Err("نام کالا را بنویس".to_string());
     }
     let unit = input
         .unit
@@ -169,7 +162,7 @@ pub fn save(conn: &Connection, input: &ProductInput) -> Res<Product> {
             let current = load(conn, id)?;
             if let Some(other) = &same {
                 if other.id != id {
-                    return Err("این نام برای کالای دیگری ثبت شده".to_string());
+                    return Err("این نام مال کالای دیگری است".to_string());
                 }
             }
             Some(current)
@@ -195,7 +188,7 @@ pub fn save(conn: &Connection, input: &ProductInput) -> Res<Product> {
                     now
                 ],
             )
-            .map_err(|e| fail("ذخیره کالا نشد", e))?;
+            .map_err(|e| db::oops("ذخیره کالا نشد", e))?;
             (p.id, "update")
         }
         None => {
@@ -211,7 +204,7 @@ pub fn save(conn: &Connection, input: &ProductInput) -> Res<Product> {
                     now
                 ],
             )
-            .map_err(|e| fail("ثبت کالای تازه نشد", e))?;
+            .map_err(|e| db::oops("ذخیره کالا نشد", e))?;
             (conn.last_insert_rowid(), "create")
         }
     };
@@ -251,7 +244,7 @@ pub fn remember_price(conn: &Connection, product_id: i64, kind: &str, price: i64
          VALUES(?1, NULL, ?2, ?3, ?4, ?5)",
         rusqlite::params![product_id, kind, price, db::today(), at],
     )
-    .map_err(|e| fail("ثبت قیمت نشد", e))?;
+    .map_err(|e| db::oops("ثبت قیمت نشد", e))?;
     Ok(())
 }
 
@@ -262,7 +255,7 @@ fn prices<P: rusqlite::Params>(
 ) -> Res<Vec<PricePoint>> {
     let mut stmt = conn
         .prepare(sql)
-        .map_err(|e| fail("سابقه قیمت خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن قیمت‌ها نشد", e))?;
     let rows = stmt
         .query_map(args, |r| {
             Ok(PricePoint {
@@ -270,9 +263,9 @@ fn prices<P: rusqlite::Params>(
                 day: r.get(1)?,
             })
         })
-        .map_err(|e| fail("سابقه قیمت خوانده نشد", e))?
+        .map_err(|e| db::oops("خواندن قیمت‌ها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("سابقه قیمت خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن قیمت‌ها نشد", e))?;
     Ok(rows)
 }
 
@@ -332,12 +325,12 @@ pub fn usual(conn: &Connection, party_id: i64) -> Res<Vec<Product>> {
              ORDER BY last_day DESC, last_doc DESC
              LIMIT ?2",
         )
-        .map_err(|e| fail("کالاهای همیشگی خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاهای همیشگی نشد", e))?;
     let rows = stmt
         .query_map(rusqlite::params![party_id, USUAL_MAX as i64], from_row)
-        .map_err(|e| fail("کالاهای همیشگی خوانده نشد", e))?
+        .map_err(|e| db::oops("خواندن کالاهای همیشگی نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("کالاهای همیشگی خوانده نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاهای همیشگی نشد", e))?;
     Ok(rows)
 }
 
@@ -372,28 +365,28 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
             let a: ListArgs = serde_json::from_value(args.clone()).unwrap_or(ListArgs { q: None });
             let conn = ctx.conn()?;
             let list = list(&conn, a.q.as_deref())?;
-            serde_json::to_value(list).map_err(|e| fail("فهرست کالاها ساخته نشد", e))
+            serde_json::to_value(list).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         "products.save" => (|| -> Res<Value> {
             let a: SaveArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "کالای فرستاده‌شده خوانده نشد".to_string())?;
+                .map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             let product = save(&conn, &a.product)?;
-            serde_json::to_value(product).map_err(|e| fail("کالا ساخته نشد", e))
+            serde_json::to_value(product).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         "products.history" => (|| -> Res<Value> {
             let a: HistoryArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "درخواست سابقه قیمت خوانده نشد".to_string())?;
+                .map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             let points = history(&conn, a.product_id, a.party_id)?;
-            serde_json::to_value(points).map_err(|e| fail("سابقه قیمت ساخته نشد", e))
+            serde_json::to_value(points).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         "products.usual" => (|| -> Res<Value> {
             let a: UsualArgs = serde_json::from_value(args.clone())
-                .map_err(|_| "درخواست کالاهای همیشگی خوانده نشد".to_string())?;
+                .map_err(|_| "مشکلی پیش آمد".to_string())?;
             let conn = ctx.conn()?;
             let items = usual(&conn, a.party_id)?;
-            serde_json::to_value(items).map_err(|e| fail("کالاهای همیشگی ساخته نشد", e))
+            serde_json::to_value(items).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         _ => return None,
     })
@@ -594,6 +587,26 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit WHERE entity = 'product'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(audits, 2);
+
+        // Renaming a second product onto that name is refused, out loud.
+        let other = save(
+            &conn,
+            &ProductInput {
+                name: "عدس".to_string(),
+                ..ProductInput::default()
+            },
+        )
+        .unwrap();
+        let err = save(
+            &conn,
+            &ProductInput {
+                id: Some(other.id),
+                name: NOK.to_string(),
+                ..ProductInput::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(err, "این نام مال کالای دیگری است");
     }
 
     #[test]

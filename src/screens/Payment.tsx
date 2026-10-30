@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { currencyLabel, fa, fmtAmount, parseAmount } from "../format";
+import { currencyLabel, currencyScale, fa, fmtAmount, parseAmount } from "../format";
 import { today } from "../jalali";
 import { useApp, useNav } from "../nav";
 import type { AllocationInput, Party, PartyBook, PartyCard } from "../types";
@@ -130,13 +130,16 @@ export default function Payment(props: { partyId?: number }) {
     }
     setBusy(true);
     try {
+      // The last word on which papers this money settles, asked again at the
+      // moment of saving so a fast keystroke can never save a stale plan.
+      const planNow = await api.suggestAllocations(party.id, amount);
       await api.savePayment({
         partyId: party.id,
         direction,
         amount,
         day: today(),
         method,
-        allocations: plan,
+        allocations: planNow,
       });
       toast(direction === "in" ? "پول ثبت شد" : "پرداخت ثبت شد", "ok");
       if (nav.canGoBack) nav.back();
@@ -149,13 +152,25 @@ export default function Payment(props: { partyId?: number }) {
 
   // ----------------------------------------------------------------- words
 
-  const settled = plan.reduce((n, a) => n + a.amount, 0);
-  const extra = Math.max(0, amount - settled);
-  const first = plan[0] ? book?.docs.find((d) => d.id === plan[0]!.docId) : undefined;
+  // What is left over is a fact about the balance, not about the plan: a debt
+  // that came from «مانده از قبل» has no paper to land on, and the money still
+  // pays it down.
   const after = book ? book.balance + (direction === "in" ? -amount : amount) : 0;
+  const over = direction === "in" ? Math.max(0, -after) : Math.max(0, after);
+  const first = plan[0] ? book?.docs.find((d) => d.id === plan[0]!.docId) : undefined;
   // Before a number is typed the line still has something worth saying: where
   // the account stands right now.
   const shownBalance = amount === 0 ? (book?.balance ?? 0) : after;
+
+  // Rial, a big debt, or both: the amount steps down before it can be cut off.
+  const amountText = fmtAmount(amount);
+  const amountSize =
+    amountText.length > 13 ? "is-xlong" : amountText.length > 10 ? "is-long" : "";
+
+  // What is actually owed to him (or by him). «همه» types exactly this, in the
+  // shop's own unit, so the same parse path runs as if he had pressed the keys.
+  const owed = direction === "in" ? Math.max(0, book?.balance ?? 0) : Math.max(0, -(book?.balance ?? 0));
+  const settleAll = () => setDigits(String(Math.round(owed * currencyScale())));
 
   if (!ready) {
     return (
@@ -211,7 +226,7 @@ export default function Payment(props: { partyId?: number }) {
               ))}
             </Card>
           ) : (
-            <Empty title="پیدا نشد" hint="نام را کوتاه‌تر بنویس." />
+            <Empty title="پیدا نشد" />
           )}
         </div>
       ) : (
@@ -220,8 +235,13 @@ export default function Payment(props: { partyId?: number }) {
             <div className="pay-quote">
               <div className="pay-amount">
                 <span className="pay-amount__label">مبلغ</span>
-                <span className="pay-amount__num num">{fmtAmount(amount)}</span>
+                <span className={`pay-amount__num num ${amountSize}`}>{amountText}</span>
                 <span className="pay-amount__unit">{currencyLabel()}</span>
+                {owed > 0 && (
+                  <button className="pay-all" onClick={settleAll}>
+                    همه
+                  </button>
+                )}
               </div>
 
               <div
@@ -252,13 +272,10 @@ export default function Payment(props: { partyId?: number }) {
                     {plan.length > 1 ? ` و ${fa(plan.length - 1)} برگه دیگر` : ""}
                   </div>
                 )}
-                {extra > 0 && (
+                {over > 0 && (
                   <div className="pay-say__line pay-say__line--credit">
-                    {fmtAmount(extra)} بیشتر است و به حسابش می‌ماند
+                    {fmtAmount(over)} بیشتر است و به حسابش می‌ماند
                   </div>
-                )}
-                {amount > 0 && !first && (
-                  <div className="pay-say__line">به حسابش می‌ماند</div>
                 )}
               </div>
             </div>

@@ -33,7 +33,7 @@ pub fn get(conn: &Connection, id: i64) -> Res<Note> {
         from_row,
     )
     .optional()
-    .map_err(|_| "دفتر خوانده نشد".to_string())?
+    .map_err(|e| crate::db::oops("خواندن یادداشت‌ها نشد", e))?
     .ok_or_else(|| "یادداشت پیدا نشد".to_string())
 }
 
@@ -65,12 +65,12 @@ pub fn list(conn: &Connection, q: Option<&str>, limit: Option<i64>) -> Res<Vec<N
              WHERE (?1 IS NULL OR title LIKE ?1 ESCAPE '\\' OR body LIKE ?1 ESCAPE '\\')
              ORDER BY day DESC, id DESC LIMIT ?2"
         ))
-        .map_err(|_| "دفتر خوانده نشد".to_string())?;
+        .map_err(|e| crate::db::oops("خواندن یادداشت‌ها نشد", e))?;
     let rows = stmt
         .query_map(params![pattern, limit], from_row)
-        .map_err(|_| "دفتر خوانده نشد".to_string())?
+        .map_err(|e| crate::db::oops("خواندن یادداشت‌ها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| "دفتر خوانده نشد".to_string())?;
+        .map_err(|e| crate::db::oops("خواندن یادداشت‌ها نشد", e))?;
     Ok(rows)
 }
 
@@ -111,7 +111,7 @@ pub fn save(conn: &Connection, input: &NoteInput) -> Res<Note> {
                 "UPDATE note SET day = ?1, title = ?2, body = ?3, updated_at = ?4 WHERE id = ?5",
                 params![day, title, body, now, note.id],
             )
-            .map_err(|_| "ذخیره نشد".to_string())?;
+            .map_err(|e| crate::db::oops("ذخیره نشد", e))?;
             note.id
         }
         None => {
@@ -120,7 +120,7 @@ pub fn save(conn: &Connection, input: &NoteInput) -> Res<Note> {
                  VALUES(?1, ?2, ?3, ?4, ?4)",
                 params![day, title, body, now],
             )
-            .map_err(|_| "ذخیره نشد".to_string())?;
+            .map_err(|e| crate::db::oops("ذخیره نشد", e))?;
             conn.last_insert_rowid()
         }
     };
@@ -133,7 +133,7 @@ pub fn save(conn: &Connection, input: &NoteInput) -> Res<Note> {
 pub fn remove(conn: &Connection, id: i64) -> Res<bool> {
     let gone = conn
         .execute("DELETE FROM note WHERE id = ?1", [id])
-        .map_err(|_| "پاک نشد".to_string())?;
+        .map_err(|e| crate::db::oops("پاک نشد", e))?;
     if gone == 0 {
         return Err("یادداشت پیدا نشد".to_string());
     }

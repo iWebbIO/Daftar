@@ -121,7 +121,7 @@ fn checked_plan(
     let mut out = Vec::new();
     for allocation in &input.allocations {
         if allocation.amount < 0 {
-            return Err("مبلغ را درست وارد کنید".to_string());
+            return Err("مبلغ را درست بزن".to_string());
         }
         if allocation.amount == 0 {
             continue;
@@ -156,7 +156,7 @@ fn checked_plan(
 /// and anything extra is credit.
 pub fn record(conn: &Connection, input: &PaymentInput, auto: bool) -> Res<Payment> {
     if input.amount <= 0 {
-        return Err("مبلغ را درست وارد کنید".to_string());
+        return Err("مبلغ را درست بزن".to_string());
     }
     let direction = match input.direction.as_str() {
         "in" => "in",
@@ -292,7 +292,7 @@ pub fn save(conn: &Connection, input: &PaymentInput) -> Res<Payment> {
 pub fn void(conn: &Connection, id: i64, reason: &str) -> Res<Payment> {
     let reason = reason.trim().to_string();
     if reason.is_empty() {
-        return Err("دلیلش را بنویسید".to_string());
+        return Err("دلیلش را بنویس".to_string());
     }
     in_tx(conn, |conn| {
         let payment = load(conn, id)?;
@@ -696,7 +696,7 @@ mod tests {
             handle(&ctx, "payments.void", &json!({"id": saved.id, "reason": ""}))
                 .unwrap()
                 .unwrap_err(),
-            "دلیلش را بنویسید"
+            "دلیلش را بنویس"
         );
     }
 

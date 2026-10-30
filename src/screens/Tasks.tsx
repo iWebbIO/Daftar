@@ -56,11 +56,19 @@ export default function Tasks() {
 
   const toggle = async (task: Task) => {
     setBusyId(task.id);
+    // Struck and dimmed before the answer comes back: a tick must feel done.
+    setRows(
+      (old) =>
+        old?.map((r) =>
+          r.task.id === task.id ? { ...r, task: { ...r.task, done: !r.task.done } } : r,
+        ) ?? null,
+    );
     try {
       await api.toggleTask(task.id);
       await load();
     } catch (e) {
       toast(errorText(e), "bad");
+      await load();
     } finally {
       setBusyId(null);
     }
@@ -128,6 +136,7 @@ export default function Tasks() {
                 }
                 title={task.text}
                 sub={taskSub(task, partyName)}
+                note={late(task) ? <Pill tone="warn">گذشته</Pill> : undefined}
               />
             ))}
           </Card>
@@ -195,6 +204,11 @@ function taskSub(task: Task, partyName: string | null): string | undefined {
   if (task.day !== null) bits.push(relativeDay(task.day));
   if (partyName) bits.push(partyName);
   return bits.length > 0 ? bits.join(" · ") : undefined;
+}
+
+/** A day that has come and gone while the task is still undone. */
+function late(task: Task): boolean {
+  return task.day !== null && task.day < today();
 }
 
 /** A box big enough to hit without looking, with a line through the words instead. */
@@ -332,9 +346,11 @@ function AddTask({
         </>
       )}
 
-      <Btn wide busy={busy} disabled={text.trim() === ""} onClick={() => void save()}>
-        افزودن
-      </Btn>
+      <div className="tk-submit">
+        <Btn wide busy={busy} disabled={text.trim() === ""} onClick={() => void save()}>
+          افزودن
+        </Btn>
+      </div>
     </Sheet>
   );
 }

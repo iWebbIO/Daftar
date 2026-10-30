@@ -4,8 +4,8 @@
 //! customer's name, part of a phone number, «نخود», the number of an invoice or
 //! the amount written on it — «۵٬۱۷۵», `5175`, «5,175» are the same number.
 
-use crate::db::Res;
-use crate::domain::products::{digits_of, fail, normalise};
+use crate::db::{self, Res};
+use crate::domain::products::{digits_of, normalise};
 use crate::dto::SearchHit;
 use crate::jalali;
 use crate::money;
@@ -102,7 +102,7 @@ pub fn all(conn: &Connection, q: &str) -> Res<Vec<SearchHit>> {
 fn parties(conn: &Connection, needle: &str, digits: &str, out: &mut Vec<Found>) -> Res<()> {
     let mut stmt = conn
         .prepare("SELECT id, name, phone, archived, updated_at FROM party")
-        .map_err(|e| fail("جستجوی مشتری‌ها نشد", e))?;
+        .map_err(|e| db::oops("خواندن طرف حساب‌ها نشد", e))?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -113,9 +113,9 @@ fn parties(conn: &Connection, needle: &str, digits: &str, out: &mut Vec<Found>) 
                 r.get::<_, i64>(4)?,
             ))
         })
-        .map_err(|e| fail("جستجوی مشتری‌ها نشد", e))?
+        .map_err(|e| db::oops("خواندن طرف حساب‌ها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("جستجوی مشتری‌ها نشد", e))?;
+        .map_err(|e| db::oops("خواندن طرف حساب‌ها نشد", e))?;
 
     for (id, name, phone, archived, updated_at) in rows {
         let by_name = how_well(&name, needle);
@@ -153,7 +153,7 @@ fn products(conn: &Connection, needle: &str, out: &mut Vec<Found>) -> Res<()> {
                     p.active
              FROM product p",
         )
-        .map_err(|e| fail("جستجوی کالاها نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -165,9 +165,9 @@ fn products(conn: &Connection, needle: &str, out: &mut Vec<Found>) -> Res<()> {
                 r.get::<_, i64>(5)?,
             ))
         })
-        .map_err(|e| fail("جستجوی کالاها نشد", e))?
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("جستجوی کالاها نشد", e))?;
+        .map_err(|e| db::oops("خواندن کالاها نشد", e))?;
 
     for (id, name, unit, updated_at, last_price, active) in rows {
         let Some(mut score) = how_well(&name, needle) else { continue };
@@ -212,7 +212,7 @@ fn documents(
              FROM doc d JOIN party p ON p.id = d.party_id
              WHERE d.status <> 'void'",
         )
-        .map_err(|e| fail("جستجوی فاکتورها نشد", e))?;
+        .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -224,9 +224,9 @@ fn documents(
                 r.get::<_, String>(5)?,
             ))
         })
-        .map_err(|e| fail("جستجوی فاکتورها نشد", e))?
+        .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("جستجوی فاکتورها نشد", e))?;
+        .map_err(|e| db::oops("خواندن فاکتورها نشد", e))?;
 
     for (id, kind, number, day, total, party_name) in rows {
         let by_number = match number_wanted {
@@ -249,7 +249,7 @@ fn documents(
             hit: SearchHit {
                 kind,
                 id,
-                title: format!("{word} شماره {}", money::fa_digits(&number.to_string())),
+                title: format!("{word} {}", money::fa_digits(&number.to_string())),
                 subtitle: format!("{} · {}", party_name, jalali::long(day)),
                 amount: Some(total),
             },
@@ -261,7 +261,7 @@ fn documents(
 fn notes(conn: &Connection, needle: &str, out: &mut Vec<Found>) -> Res<()> {
     let mut stmt = conn
         .prepare("SELECT id, title, body, day FROM note")
-        .map_err(|e| fail("جستجوی یادداشت‌ها نشد", e))?;
+        .map_err(|e| db::oops("خواندن یادداشت‌ها نشد", e))?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -271,9 +271,9 @@ fn notes(conn: &Connection, needle: &str, out: &mut Vec<Found>) -> Res<()> {
                 r.get::<_, i64>(3)?,
             ))
         })
-        .map_err(|e| fail("جستجوی یادداشت‌ها نشد", e))?
+        .map_err(|e| db::oops("خواندن یادداشت‌ها نشد", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| fail("جستجوی یادداشت‌ها نشد", e))?;
+        .map_err(|e| db::oops("خواندن یادداشت‌ها نشد", e))?;
 
     for (id, title, body, day) in rows {
         let by_title = title
@@ -335,7 +335,7 @@ pub fn handle(ctx: &Ctx<'_>, op: &str, args: &Value) -> Option<Res<Value>> {
                 .unwrap_or(SearchArgs { q: String::new() });
             let conn = ctx.conn()?;
             let hits = all(&conn, &a.q)?;
-            serde_json::to_value(hits).map_err(|e| fail("نتیجه جستجو ساخته نشد", e))
+            serde_json::to_value(hits).map_err(|e| db::oops("آماده کردن پاسخ نشد", e))
         })(),
         _ => return None,
     })
@@ -404,7 +404,7 @@ mod tests {
             );
             let hit = hits.iter().find(|h| h.kind == "sale").unwrap();
             assert_eq!(hit.amount, Some(5_175));
-            assert_eq!(hit.title, "فروش شماره ۱۲");
+            assert_eq!(hit.title, "فروش ۱۲");
             assert_eq!(
                 hit.subtitle,
                 format!("لیلا امینی · {}", jalali::long(20_000)),
@@ -425,6 +425,7 @@ mod tests {
         // The invoice comes first; the phone number that also contains «12» follows.
         assert_eq!(hits[0].kind, "sale");
         assert_eq!(hits[0].id, 1);
+        assert_eq!(hits[0].title, "فروش ۱۲");
         assert_eq!(hits[0].amount, Some(5_175));
     }
 

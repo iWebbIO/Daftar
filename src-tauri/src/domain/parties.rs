@@ -218,7 +218,7 @@ fn clean(value: &Option<String>) -> Option<String> {
 pub fn save(conn: &Connection, input: &PartyInput) -> Res<Party> {
     let name = input.name.trim().to_string();
     if name.is_empty() {
-        return Err("نام را بنویسید".to_string());
+        return Err("نام را بنویس".to_string());
     }
     let kind = match input.kind.as_deref().unwrap_or("").trim() {
         "supplier" => "supplier",
