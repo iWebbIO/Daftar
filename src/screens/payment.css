@@ -9,7 +9,11 @@
 }
 
 .pay-quote {
-  margin: auto 0;
+  /* Sit the amount just above the method row instead of floating it in the
+     middle of the screen: the eye should travel from the number to the keypad,
+     not across a page of nothing. */
+  margin-top: auto;
+  margin-bottom: 14px;
   display: flex;
   flex-direction: column;
 }
